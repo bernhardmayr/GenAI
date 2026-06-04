@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Die Legende vom Triforce ⚔️</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    min-height: 100vh;
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: #0e1411;
+    color: #e8f5ee;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 12px; gap: 10px;
+    -webkit-user-select: none; user-select: none; touch-action: none;
+  }
+  a.back { align-self: flex-start; color: #9be7c4; text-decoration: none; font-size: 14px; opacity: 0.85; }
+  a.back:hover { opacity: 1; }
+  h1 { font-size: 22px; letter-spacing: 1px; }
+  #hud {
+    width: min(96vw, 512px);
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 18px; font-weight: 700;
+  }
+  #hud .right { display: flex; gap: 16px; align-items: center; }
+  #hearts { letter-spacing: 2px; }
+  #stage { position: relative; width: min(96vw, 512px); }
+  canvas {
+    display: block; width: 100%; image-rendering: pixelated;
+    background: #1d2b22; border-radius: 8px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+  }
+  #msg {
+    position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%);
+    background: rgba(8,12,10,0.82); padding: 8px 16px; border-radius: 8px;
+    font-size: 14px; opacity: 0; transition: opacity 0.25s ease; pointer-events: none;
+    white-space: nowrap;
+  }
+  #msg.show { opacity: 1; }
+  #overlay {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center; gap: 16px;
+    background: rgba(8,12,10,0.86); border-radius: 8px; padding: 22px;
+  }
+  #overlay.hidden { display: none; }
+  #overlay h2 {
+    font-size: clamp(26px, 7vw, 42px);
+    background: linear-gradient(90deg, #ffd166, #06d6a0);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  #overlay p { max-width: 380px; line-height: 1.5; font-size: 14px; opacity: 0.88; }
+  button {
+    font: inherit; font-weight: 700; font-size: 17px; color: #08231b;
+    background: linear-gradient(90deg, #ffd166, #06d6a0); border: none;
+    border-radius: 999px; padding: 12px 30px; cursor: pointer;
+  }
+  button:hover { transform: translateY(-2px); }
+  .controls { font-size: 12px; opacity: 0.6; text-align: center; max-width: 512px; }
+  /* touch d-pad */
+  #touch { display: none; width: min(96vw, 512px); justify-content: space-between; margin-top: 4px; }
+  #touch.on { display: flex; }
+  .pad { display: grid; grid-template-columns: repeat(3, 52px); grid-template-rows: repeat(3, 52px); gap: 6px; }
+  .pad div, .act {
+    background: #243b32; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+    font-size: 20px; color: #cdeede; user-select: none;
+  }
+  .act { width: 84px; height: 84px; align-self: center; background: #6a3030; font-size: 15px; font-weight: 700; }
+</style>
+</head>
+<body>
+  <a class="back" href="index.html">← Zurück zur Spieleauswahl</a>
+  <h1>⚔️ Die Legende vom Triforce</h1>
+  <div id="hud">
+    <div id="hearts">♥♥♥</div>
+    <div class="right"><span id="rupees">💎 0</span><span id="keys">🗝️ 0</span></div>
+  </div>
+
+  <div id="stage">
+    <canvas id="game" width="512" height="352"></canvas>
+    <div id="msg"></div>
+    <div id="overlay">
+      <h2>Die Legende vom Triforce</h2>
+      <p>Erkunde das Land, besiege die Schleim-Monster mit deinem Schwert, finde den
+         <b style="color:#ffd166">Schlüssel 🗝️</b> und öffne die verschlossene Tür zum
+         <b style="color:#ffd166">Triforce</b>.</p>
+      <p class="controls">Bewegen: <b>WASD</b> / Pfeiltasten · Schwert: <b>Leertaste</b> oder <b>J</b></p>
+      <button id="startBtn">Abenteuer starten</button>
+    </div>
+  </div>
+
+  <div id="touch">
+    <div class="pad">
+      <div></div><div data-dir="up">▲</div><div></div>
+      <div data-dir="left">◀</div><div></div><div data-dir="right">▶</div>
+      <div></div><div data-dir="down">▼</div><div></div>
+    </div>
+    <div class="act" data-act="attack">⚔️<br>Hieb</div>
+  </div>
+  <p class="controls">Tipp: Gegner geben manchmal 💎 ab. Volle Herzen findest du als Bonus.</p>
+
+<script>
+(function () {
+  "use strict";
+
+  const TS = 32, COLS = 16, ROWS = 11;
+  const W = COLS * TS, H = ROWS * TS;
+  const canvas = document.getElementById("game");
+  const ctx = canvas.getContext("2d");
+  const overlay = document.getElementById("overlay");
+  const heartsEl = document.getElementById("hearts");
+  const rupeesEl = document.getElementById("rupees");
+  const keysEl = document.getElementById("keys");
+  const msgEl = document.getElementById("msg");
+
+  // ---------- World definition ----------
+  // Rooms form a plus shape. Locked door connects start (1,1) south to treasure (1,2).
+  const ROOMS = {
+    "1,1": { start: true, obstacles: true },
+    "1,0": { enemies: 3, rupees: 2, obstacles: true },
+    "2,1": { enemies: 3, key: true, obstacles: true },
+    "0,1": { enemies: 2, rupees: 2, heart: true, obstacles: true },
+    "1,2": { treasure: true }
+  };
+  const DIRS = { N: [0, -1], S: [0, 1, ], E: [1, 0], W: [-1, 0] };
+  const OPP = { N: "S", S: "N", E: "W", W: "E" };
+
+  let unlocked = false;          // locked door opened?
+  const roomState = {};          // persistent per-room enemies/items
+
+  function hasRoom(rx, ry) { return ROOMS.hasOwnProperty(rx + "," + ry); }
+  function lockedEdge(rx, ry, dir) {
+    if (unlocked) return false;
+    if (rx === 1 && ry === 1 && dir === "S") return true;
+    if (rx === 1 && ry === 2 && dir === "N") return true;
+    return false;
+  }
+
+  // Build the tile grid for a room: 0 floor, 1 wall, 2 locked door.
+  function buildGrid(rx, ry) {
+    const g = [];
+    for (let y = 0; y < ROWS; y++) {
+      g.push(new Array(COLS).fill(0));
+      for (let x = 0; x < COLS; x++) {
+        if (x === 0 || y === 0 || x === COLS - 1 || y === ROWS - 1) g[y][x] = 1;
+      }
+    }
+    const midC = (COLS / 2) | 0, midR = (ROWS / 2) | 0;
+    for (const dir in DIRS) {
+      const [dx, dy] = DIRS[dir];
+      if (!hasRoom(rx + dx, ry + dy)) continue;
+      const locked = lockedEdge(rx, ry, dir);
+      const t = locked ? 2 : 0;
+      if (dx !== 0) { // east/west gap (vertical opening)
+        const col = dx > 0 ? COLS - 1 : 0;
+        for (let k = -1; k <= 1; k++) g[midR + k][col] = t;
+      } else { // north/south gap (horizontal opening)
+        const row = dy > 0 ? ROWS - 1 : 0;
+        for (let k = -1; k <= 1; k++) g[row][midC + k] = t;
+      }
+    }
+    if (ROOMS[rx + "," + ry].obstacles) {
+      [[4, 3], [11, 3], [4, 7], [11, 7]].forEach(([x, y]) => { g[y][x] = 1; });
+    }
+    return g;
+  }
+
+  // ---------- Game state ----------
+  let cur = { rx: 1, ry: 1 };
+  let grid = buildGrid(1, 1);
+  let running = false, won = false, dead = false;
+
+  const player = {
+    x: W / 2 - 11, y: H / 2 - 11, w: 22, h: 22,
+    speed: 2.4, dir: "S", hp: 6, maxHp: 6, rupees: 0, keys: 0,
+    inv: 0, attack: 0, kbx: 0, kby: 0
+  };
+
+  function roomKey() { return cur.rx + "," + cur.ry; }
+
+  function ensureRoom() {
+    const k = roomKey();
+    if (roomState[k]) return roomState[k];
+    const def = ROOMS[k];
+    const st = { enemies: [], items: [], spawned: true };
+    // enemies
+    const n = def.enemies || 0;
+    const spots = freeSpots(n);
+    for (let i = 0; i < n; i++) {
+      const [sx, sy] = spots[i];
+      st.enemies.push({ x: sx, y: sy, w: 24, h: 24, hp: 2, dir: "S",
+        t: Math.random() * 100, kbx: 0, kby: 0, hit: 0 });
+    }
+    // items
+    if (def.key) st.items.push({ type: "key", x: W / 2 - 10, y: H / 2 - 10, w: 20, h: 20 });
+    if (def.heart) st.items.push({ type: "heart", x: W / 2 - 10, y: H / 2 - 10, w: 20, h: 20 });
+    if (def.treasure) st.items.push({ type: "triforce", x: W / 2 - 18, y: H / 2 - 30, w: 36, h: 32 });
+    const rc = def.rupees || 0;
+    const rspots = freeSpots(rc);
+    for (let i = 0; i < rc; i++) st.items.push({ type: "rupee", x: rspots[i][0] + 4, y: rspots[i][1] + 4, w: 16, h: 16 });
+    roomState[k] = st;
+    return st;
+  }
+
+  function freeSpots(n) {
+    const spots = [];
+    let guard = 0;
+    while (spots.length < n && guard++ < 500) {
+      const tx = 2 + ((Math.random() * (COLS - 4)) | 0);
+      const ty = 2 + ((Math.random() * (ROWS - 4)) | 0);
+      if (grid[ty][tx] !== 0) continue;
+      // keep clear of the very center (player spawn)
+      if (Math.abs(tx - COLS / 2) < 2 && Math.abs(ty - ROWS / 2) < 2) continue;
+      spots.push([tx * TS + 4, ty * TS + 4]);
+    }
+    while (spots.length < n) spots.push([3 * TS, 3 * TS]);
+    return spots;
+  }
+
+  // ---------- Collision ----------
+  function tileBlocked(t) { return t === 1 || (t === 2); }
+  function rectHitsWall(x, y, w, h) {
+    const x0 = Math.floor(x / TS), x1 = Math.floor((x + w - 1) / TS);
+    const y0 = Math.floor(y / TS), y1 = Math.floor((y + h - 1) / TS);
+    for (let ty = y0; ty <= y1; ty++)
+      for (let tx = x0; tx <= x1; tx++) {
+        if (ty < 0 || tx < 0 || ty >= ROWS || tx >= COLS) continue;
+        if (tileBlocked(grid[ty][tx])) return true;
+      }
+    return false;
+  }
+  function moveBox(o, dx, dy) {
+    if (dx) { if (!rectHitsWall(o.x + dx, o.y, o.w, o.h)) o.x += dx; }
+    if (dy) { if (!rectHitsWall(o.x, o.y + dy, o.w, o.h)) o.y += dy; }
+  }
+  function overlap(a, b) {
+    return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+  }
+
+  // ---------- Input ----------
+  const keys = {};
+  const KMAP = { w: "up", a: "left", s: "down", d: "right",
+    arrowup: "up", arrowleft: "left", arrowdown: "down", arrowright: "right" };
+  window.addEventListener("keydown", e => {
+    const k = e.key.toLowerCase();
+    if (KMAP[k]) { keys[KMAP[k]] = true; e.preventDefault(); }
+    if (k === " " || k === "j") { keys.attack = true; e.preventDefault(); }
+    if ((k === " " || k === "enter") && (!running || dead || won)) startGame();
+  });
+  window.addEventListener("keyup", e => {
+    const k = e.key.toLowerCase();
+    if (KMAP[k]) keys[KMAP[k]] = false;
+    if (k === " " || k === "j") keys.attack = false;
+  });
+
+  // touch controls
+  if ("ontouchstart" in window) {
+    document.getElementById("touch").classList.add("on");
+    document.querySelectorAll("#touch [data-dir]").forEach(el => {
+      const d = el.dataset.dir;
+      const on = e => { e.preventDefault(); keys[d] = true; };
+      const off = e => { e.preventDefault(); keys[d] = false; };
+      el.addEventListener("touchstart", on); el.addEventListener("touchend", off);
+      el.addEventListener("touchcancel", off);
+    });
+    const atk = document.querySelector('[data-act="attack"]');
+    atk.addEventListener("touchstart", e => { e.preventDefault(); keys.attack = true; });
+    atk.addEventListener("touchend", e => { e.preventDefault(); keys.attack = false; });
+  }
+
+  function showMsg(text) {
+    msgEl.textContent = text;
+    msgEl.classList.add("show");
+    clearTimeout(showMsg._t);
+    showMsg._t = setTimeout(() => msgEl.classList.remove("show"), 1800);
+  }
+
+  // ---------- Update ----------
+  function update() {
+    if (!running || dead || won) return;
+    const st = ensureRoom();
+
+    // movement (knockback overrides)
+    let dx = 0, dy = 0;
+    if (player.kbx || player.kby) {
+      moveBox(player, player.kbx, player.kby);
+      player.kbx *= 0.8; player.kby *= 0.8;
+      if (Math.abs(player.kbx) < 0.3) player.kbx = 0;
+      if (Math.abs(player.kby) < 0.3) player.kby = 0;
+    } else {
+      if (keys.up) { dy = -1; player.dir = "N"; }
+      else if (keys.down) { dy = 1; player.dir = "S"; }
+      if (keys.left) { dx = -1; player.dir = "W"; }
+      else if (keys.right) { dx = 1; player.dir = "E"; }
+      if (dx && dy) { dx *= 0.707; dy *= 0.707; }
+      moveBox(player, dx * player.speed, dy * player.speed);
+    }
+
+    // attack
+    if (keys.attack && player.attack <= 0) player.attack = 16;
+    if (player.attack > 0) player.attack--;
+    const sword = swordBox();
+
+    // room transitions
+    if (player.x < -2) tryTransition("W");
+    else if (player.x + player.w > W + 2) tryTransition("E");
+    else if (player.y < -2) tryTransition("N");
+    else if (player.y + player.h > H + 2) tryTransition("S");
+
+    // auto-open locked door when holding a key
+    if (player.keys > 0 && !unlocked && nearLockedDoor()) {
+      unlocked = true; player.keys--;
+      grid = buildGrid(cur.rx, cur.ry);
+      showMsg("Die Tür öffnet sich! 🚪");
+    }
+
+    if (player.inv > 0) player.inv--;
+
+    // enemies
+    for (const e of st.enemies) {
+      e.t++;
+      if (e.hit > 0) e.hit--;
+      if (e.kbx || e.kby) {
+        moveBox(e, e.kbx, e.kby);
+        e.kbx *= 0.8; e.kby *= 0.8;
+        if (Math.abs(e.kbx) < 0.3) e.kbx = 0;
+        if (Math.abs(e.kby) < 0.3) e.kby = 0;
+      } else {
+        // chase with a little wander
+        const cx = player.x - e.x, cy = player.y - e.y;
+        const dist = Math.hypot(cx, cy) || 1;
+        const wob = Math.sin(e.t * 0.05) * 0.4;
+        let mx = (cx / dist) + wob, my = (cy / dist) - wob;
+        const sp = 1.1;
+        moveBox(e, mx * sp, my * sp);
+      }
+      // sword hits enemy
+      if (sword && e.hit <= 0 && overlap(sword, e)) {
+        e.hp--; e.hit = 12;
+        const a = Math.atan2(e.y - player.y, e.x - player.x);
+        e.kbx = Math.cos(a) * 7; e.kby = Math.sin(a) * 7;
+      }
+      // enemy touches player
+      if (player.inv <= 0 && overlap(player, e)) {
+        damagePlayer(1, e);
+      }
+    }
+    st.enemies = st.enemies.filter(e => {
+      if (e.hp <= 0) {
+        if (Math.random() < 0.5) st.items.push({ type: "rupee", x: e.x + 2, y: e.y + 2, w: 16, h: 16 });
+        return false;
+      }
+      return true;
+    });
+
+    // items
+    for (let i = st.items.length - 1; i >= 0; i--) {
+      const it = st.items[i];
+      if (!overlap(player, it)) continue;
+      if (it.type === "rupee") { player.rupees++; showMsg("💎 +1"); st.items.splice(i, 1); }
+      else if (it.type === "heart") { player.hp = Math.min(player.maxHp, player.hp + 2); showMsg("Herz aufgefüllt! ❤️"); st.items.splice(i, 1); }
+      else if (it.type === "key") { player.keys++; showMsg("Schlüssel gefunden! 🗝️"); st.items.splice(i, 1); }
+      else if (it.type === "triforce") { won = true; showOverlayWin(); }
+    }
+
+    updateHud();
+  }
+
+  function swordBox() {
+    if (player.attack < 4 || player.attack > 13) return null; // active window
+    const len = 26, thick = 16;
+    const cx = player.x + player.w / 2, cy = player.y + player.h / 2;
+    if (player.dir === "N") return { x: cx - thick / 2, y: player.y - len, w: thick, h: len };
+    if (player.dir === "S") return { x: cx - thick / 2, y: player.y + player.h, w: thick, h: len };
+    if (player.dir === "W") return { x: player.x - len, y: cy - thick / 2, w: len, h: thick };
+    return { x: player.x + player.w, y: cy - thick / 2, w: len, h: thick };
+  }
+
+  function nearLockedDoor() {
+    const cx = (player.x + player.w / 2) / TS, cy = (player.y + player.h / 2) / TS;
+    for (let ty = Math.floor(cy) - 1; ty <= Math.floor(cy) + 1; ty++)
+      for (let tx = Math.floor(cx) - 1; tx <= Math.floor(cx) + 1; tx++)
+        if (ty >= 0 && tx >= 0 && ty < ROWS && tx < COLS && grid[ty][tx] === 2) return true;
+    return false;
+  }
+
+  function damagePlayer(dmg, from) {
+    player.hp -= dmg;
+    player.inv = 45;
+    const a = Math.atan2(player.y - from.y, player.x - from.x);
+    player.kbx = Math.cos(a) * 6; player.kby = Math.sin(a) * 6;
+    if (player.hp <= 0) { player.hp = 0; dead = true; showOverlayDead(); }
+  }
+
+  function tryTransition(dir) {
+    const [dx, dy] = DIRS[dir];
+    if (!hasRoom(cur.rx + dx, cur.ry + dy)) {
+      // clamp back inside
+      player.x = Math.max(0, Math.min(W - player.w, player.x));
+      player.y = Math.max(0, Math.min(H - player.h, player.y));
+      return;
+    }
+    cur = { rx: cur.rx + dx, ry: cur.ry + dy };
+    grid = buildGrid(cur.rx, cur.ry);
+    if (dir === "W") player.x = W - player.w - 2;
+    if (dir === "E") player.x = 2;
+    if (dir === "N") player.y = H - player.h - 2;
+    if (dir === "S") player.y = 2;
+    player.kbx = player.kby = 0;
+    ensureRoom();
+  }
+
+  // ---------- Rendering ----------
+  function render() {
+    // floor
+    for (let y = 0; y < ROWS; y++)
+      for (let x = 0; x < COLS; x++) {
+        const t = grid[y][x];
+        if (t === 1) {
+          ctx.fillStyle = "#3b4d3f";
+          ctx.fillRect(x * TS, y * TS, TS, TS);
+          ctx.fillStyle = "#2c3b30";
+          ctx.fillRect(x * TS + 3, y * TS + 3, TS - 6, TS - 6);
+        } else if (t === 2) {
+          ctx.fillStyle = "#5a3b1d";
+          ctx.fillRect(x * TS, y * TS, TS, TS);
+          ctx.fillStyle = "#8a5a2b";
+          ctx.fillRect(x * TS + 5, y * TS + 3, TS - 10, TS - 6);
+          ctx.fillStyle = "#ffd166";
+          ctx.fillRect(x * TS + TS - 11, y * TS + TS / 2 - 2, 4, 4);
+        } else {
+          ctx.fillStyle = ((x + y) & 1) ? "#26342a" : "#223028";
+          ctx.fillRect(x * TS, y * TS, TS, TS);
+        }
+      }
+
+    const st = roomState[roomKey()];
+    if (st) {
+      for (const it of st.items) drawItem(it);
+      for (const e of st.enemies) drawEnemy(e);
+    }
+    drawPlayer();
+  }
+
+  function drawItem(it) {
+    const cx = it.x + it.w / 2, cy = it.y + it.h / 2;
+    if (it.type === "rupee") {
+      ctx.fillStyle = "#06d6a0";
+      ctx.beginPath();
+      ctx.moveTo(cx, it.y); ctx.lineTo(it.x + it.w, cy);
+      ctx.lineTo(cx, it.y + it.h); ctx.lineTo(it.x, cy); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "#9bf5d8"; ctx.fillRect(cx - 1, it.y + 3, 2, it.h - 6);
+    } else if (it.type === "heart") {
+      ctx.font = "18px serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText("❤️", cx, cy);
+    } else if (it.type === "key") {
+      ctx.font = "18px serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText("🗝️", cx, cy);
+    } else if (it.type === "triforce") {
+      const g = Math.abs(Math.sin(Date.now() / 300));
+      ctx.fillStyle = "rgba(255,209,102," + (0.5 + g * 0.5) + ")";
+      tri(cx, it.y, 18);
+    }
+  }
+  function tri(cx, top, s) {
+    ctx.beginPath();
+    ctx.moveTo(cx, top); ctx.lineTo(cx - s, top + s * 1.6); ctx.lineTo(cx + s, top + s * 1.6);
+    ctx.closePath(); ctx.fill();
+  }
+
+  function drawEnemy(e) {
+    ctx.save();
+    if (e.hit > 0 && (e.hit & 2)) ctx.globalAlpha = 0.5;
+    const cx = e.x + e.w / 2, cy = e.y + e.h / 2;
+    const squish = Math.sin(e.t * 0.15) * 2;
+    ctx.fillStyle = "#b5179e";
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + squish / 2, e.w / 2, e.h / 2 - squish, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(cx - 6, cy - 3, 4, 4);
+    ctx.fillRect(cx + 2, cy - 3, 4, 4);
+    ctx.fillStyle = "#000";
+    ctx.fillRect(cx - 5, cy - 2, 2, 2);
+    ctx.fillRect(cx + 3, cy - 2, 2, 2);
+    ctx.restore();
+  }
+
+  function drawPlayer() {
+    ctx.save();
+    if (player.inv > 0 && (player.inv & 2)) ctx.globalAlpha = 0.45;
+    const x = player.x, y = player.y, w = player.w, h = player.h;
+    // body (tunic)
+    ctx.fillStyle = "#2a9d4f";
+    ctx.fillRect(x, y + 6, w, h - 6);
+    // head/face
+    ctx.fillStyle = "#f1c27d";
+    ctx.fillRect(x + 4, y, w - 8, 9);
+    // cap
+    ctx.fillStyle = "#1f7a3a";
+    ctx.fillRect(x + 2, y - 2, w - 4, 4);
+    // facing eye marker
+    ctx.fillStyle = "#1a1a2e";
+    if (player.dir === "S") { ctx.fillRect(x + 7, y + 4, 2, 2); ctx.fillRect(x + w - 9, y + 4, 2, 2); }
+    if (player.dir === "N") { ctx.fillRect(x + 7, y + 1, 2, 2); ctx.fillRect(x + w - 9, y + 1, 2, 2); }
+    if (player.dir === "E") ctx.fillRect(x + w - 8, y + 4, 2, 2);
+    if (player.dir === "W") ctx.fillRect(x + 6, y + 4, 2, 2);
+    ctx.restore();
+
+    // sword
+    const s = swordBox();
+    if (s) {
+      ctx.fillStyle = "#dfe9f3";
+      ctx.fillRect(s.x, s.y, s.w, s.h);
+      ctx.fillStyle = "#ffd166";
+      // hilt near player
+      if (player.dir === "N") ctx.fillRect(s.x - 3, s.y + s.h - 4, s.w + 6, 4);
+      if (player.dir === "S") ctx.fillRect(s.x - 3, s.y, s.w + 6, 4);
+      if (player.dir === "W") ctx.fillRect(s.x + s.w - 4, s.y - 3, 4, s.h + 6);
+      if (player.dir === "E") ctx.fillRect(s.x, s.y - 3, 4, s.h + 6);
+    }
+  }
+
+  // ---------- HUD / overlays ----------
+  function updateHud() {
+    const full = Math.floor(player.hp / 2);
+    const half = player.hp % 2;
+    let s = "♥".repeat(full);
+    if (half) s += "♡";
+    s += "·".repeat(Math.max(0, player.maxHp / 2 - full - half));
+    heartsEl.textContent = s || "—";
+    rupeesEl.textContent = "💎 " + player.rupees;
+    keysEl.textContent = "🗝️ " + player.keys;
+  }
+
+  function showOverlayWin() {
+    running = false;
+    overlay.innerHTML =
+      '<h2>🏆 Gewonnen!</h2>' +
+      '<p>Du hast das Triforce erlangt und das Land gerettet!<br>Gesammelte 💎: <b>' + player.rupees + '</b></p>' +
+      '<button id="againBtn">Nochmal spielen</button>';
+    overlay.classList.remove("hidden");
+    document.getElementById("againBtn").onclick = startGame;
+  }
+  function showOverlayDead() {
+    running = false;
+    overlay.innerHTML =
+      '<h2>Game Over</h2>' +
+      '<p>Die Monster waren stärker … Versuch es erneut, Held!</p>' +
+      '<button id="againBtn">Neu starten</button>';
+    overlay.classList.remove("hidden");
+    document.getElementById("againBtn").onclick = startGame;
+  }
+
+  function startGame() {
+    // reset everything
+    for (const k in roomState) delete roomState[k];
+    unlocked = false;
+    cur = { rx: 1, ry: 1 };
+    grid = buildGrid(1, 1);
+    Object.assign(player, {
+      x: W / 2 - 11, y: H / 2 - 11, dir: "S", hp: 6, maxHp: 6,
+      rupees: 0, keys: 0, inv: 0, attack: 0, kbx: 0, kby: 0
+    });
+    running = true; won = false; dead = false;
+    overlay.classList.add("hidden");
+    ensureRoom();
+    updateHud();
+  }
+
+  document.getElementById("startBtn").onclick = startGame;
+
+  // ---------- Loop ----------
+  function loop() {
+    update();
+    render();
+    requestAnimationFrame(loop);
+  }
+  updateHud();
+  loop();
+})();
+</script>
+</body>
+</html>

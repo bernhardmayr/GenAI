@@ -36,5 +36,13 @@ Der Aufbau ist immer garantiert lösbar.
 
 ---
 
+### ⚔️ Die Legende vom Triforce (`zelda.html`)
+Ein Top-Down-Action-Adventure im Stil des klassischen Zelda. Erkunde mehrere
+Räume mit nahtlosen Übergängen, bekämpfe Schleim-Monster mit deinem Schwert,
+sammle 💎, finde den **Schlüssel 🗝️**, öffne die verschlossene Tür und erlange das
+**Triforce**.
+**Steuerung:** Bewegen mit **WASD**/Pfeiltasten, Schwert mit **Leertaste** oder **J**
+(Touch-Steuerung auf dem Handy). Mit Herzen, Unverwundbarkeits-Frames und Rückstoß.
+
 ### Lokal spielen
 Repository klonen und `index.html` im Browser öffnen – fertig.
