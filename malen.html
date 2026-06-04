@@ -191,6 +191,23 @@
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   const W = canvas.width, H = canvas.height;
 
+  // ---------- Anzeigehöhe hart setzen ----------
+  // Manche Browser (v. a. iOS-Safari) berechnen die Höhe eines <canvas>
+  // mit width:100%/height:auto nicht und lassen es zu einem dünnen Streifen
+  // zusammenfallen. Deshalb setzen wir die Anzeigehöhe selbst – passend zur
+  // tatsächlichen Anzeigebreite, seitenverhältnistreu. Der Zeichenpuffer
+  // bleibt konstant W×H, pos() rechnet das per Bounding-Rect um.
+  function fitCanvas() {
+    const dispW = canvas.clientWidth ||
+      (canvas.parentElement ? canvas.parentElement.clientWidth : W);
+    if (dispW) canvas.style.height = (dispW * H / W) + "px";
+  }
+  window.addEventListener("resize", fitCanvas);
+  window.addEventListener("orientationchange", fitCanvas);
+  // einmal verzögert, falls Layout/Schriften noch nicht final sind
+  setTimeout(fitCanvas, 0);
+  fitCanvas();
+
   // ---------- Zustand ----------
   const state = {
     tool: "brush",
