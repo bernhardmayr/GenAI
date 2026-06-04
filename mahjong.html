@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Mahjong 🀄</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    min-height: 100vh;
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: linear-gradient(160deg, #143a2b, #0d2a1f);
+    color: #e8f5ee;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 16px 10px 28px; gap: 14px;
+    -webkit-user-select: none; user-select: none; touch-action: manipulation;
+  }
+  a.back { align-self: flex-start; color: #9be7c4; text-decoration: none; font-size: 14px; opacity: 0.85; }
+  a.back:hover { opacity: 1; }
+  h1 { font-size: 28px; letter-spacing: 1px; }
+  .bar { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; align-items: center; }
+  button {
+    font: inherit; font-size: 14px; font-weight: 600;
+    color: #0d2a1f; background: linear-gradient(90deg, #ffd166, #ffe29a);
+    border: none; border-radius: 999px; padding: 9px 16px; cursor: pointer;
+    transition: transform 0.1s ease;
+  }
+  button:hover { transform: translateY(-2px); }
+  button.ghost { background: #1f5740; color: #e8f5ee; }
+  .status { font-size: 14px; min-height: 20px; opacity: 0.9; text-align: center; }
+  .status.win { color: #ffd166; font-weight: 700; font-size: 18px; }
+
+  #boardWrap {
+    width: 100%;
+    max-width: 720px;
+    overflow: auto;
+    display: flex;
+    justify-content: center;
+  }
+  #board { position: relative; }
+  .tile {
+    position: absolute;
+    border-radius: 6px;
+    background: linear-gradient(160deg, #fbf7ea, #e6dcc0);
+    box-shadow: 0 1px 0 #b3a684, 0 3px 4px rgba(0,0,0,0.35);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    border: 1px solid #cabf9d;
+    transition: transform 0.08s ease, box-shadow 0.08s ease;
+    color: #1a3a2a;
+    overflow: hidden;
+  }
+  .tile span { line-height: 1; }
+  .tile.free:hover { transform: translateY(-1px); }
+  .tile.blocked { filter: brightness(0.74) saturate(0.7); cursor: default; }
+  .tile.sel {
+    background: linear-gradient(160deg, #fff3c4, #ffe082);
+    box-shadow: 0 0 0 2px #ffb703, 0 1px 0 #b3a684, 0 4px 6px rgba(0,0,0,0.4);
+  }
+  .tile.hint { box-shadow: 0 0 0 2px #06d6a0, 0 1px 0 #b3a684, 0 4px 6px rgba(0,0,0,0.4); }
+  .legend { font-size: 12px; opacity: 0.55; text-align: center; max-width: 460px; }
+</style>
+</head>
+<body>
+  <a class="back" href="index.html">← Zurück zur Spieleauswahl</a>
+  <h1>Mahjong 🀄</h1>
+
+  <div class="bar">
+    <button id="newBtn">Neues Spiel</button>
+    <button id="undoBtn" class="ghost">↶ Rückgängig</button>
+    <button id="hintBtn" class="ghost">💡 Tipp</button>
+    <button id="shuffleBtn" class="ghost">🔀 Mischen</button>
+  </div>
+  <div class="status" id="status"></div>
+
+  <div id="boardWrap"><div id="board"></div></div>
+  <p class="legend">Klicke zwei <b>freie</b> Steine mit demselben Bild. Frei ist ein Stein, wenn oben nichts liegt und links oder rechts Platz ist.</p>
+
+<script>
+(function () {
+  "use strict";
+
+  const boardEl = document.getElementById("board");
+  const statusEl = document.getElementById("status");
+
+  // Tile faces (Unicode Mahjong tiles). Generation pairs slots, so any palette works.
+  const FACES = [
+    "🀇","🀈","🀉","🀊","🀋","🀌","🀍","🀎","🀏",   // characters 1-9
+    "🀙","🀚","🀛","🀜","🀝","🀞","🀟","🀠","🀡",   // circles 1-9
+    "🀐","🀑","🀒","🀓","🀔","🀕","🀖","🀗","🀘",   // bamboo 1-9
+    "🀀","🀁","🀂","🀃","🀄","🀅","🀆",             // winds + dragons
+    "🀢","🀣","🀤","🀥","🀦","🀧","🀨","🀩"          // flowers + seasons
+  ];
+
+  // Tile footprint is 2x2 in half-cell units. Layout = list of {x,y,z}.
+  // A tidy 3-layer "wedding cake": fully aligned so stacking is simple.
+  function buildLayout() {
+    const slots = [];
+    function rect(w, h, xOff, yOff, z) {
+      for (let r = 0; r < h; r++)
+        for (let c = 0; c < w; c++)
+          slots.push({ x: xOff + c * 2, y: yOff + r * 2, z });
+    }
+    rect(8, 5, 0, 0, 0);   // base: 40
+    rect(6, 3, 2, 2, 1);   // middle: 18
+    rect(4, 1, 4, 4, 2);   // top: 4  -> total 62 (31 pairs)
+    return slots;
+  }
+
+  let tiles = [];     // {x,y,z,face,el,removed}
+  let selected = null;
+  let history = [];
+
+  function overlapsAbove(a, b) {
+    return b.z === a.z + 1 && Math.abs(b.x - a.x) < 2 && Math.abs(b.y - a.y) < 2;
+  }
+  function sameLayerAt(a, b, dx) {
+    return b.z === a.z && b.x === a.x + dx && Math.abs(b.y - a.y) < 2;
+  }
+
+  function isFree(tile, list) {
+    const live = list.filter(t => !t.removed && t !== tile);
+    if (live.some(t => overlapsAbove(tile, t))) return false;
+    const leftBlocked = live.some(t => sameLayerAt(tile, t, -2));
+    const rightBlocked = live.some(t => sameLayerAt(tile, t, 2));
+    return !leftBlocked || !rightBlocked;
+  }
+
+  // Generate a guaranteed-solvable deal by removing free pairs from a full board.
+  // Retries (a deal can occasionally dead-end with <2 free slots mid-build).
+  function generate() {
+    for (let attempt = 0; attempt < 200; attempt++) {
+      const slots = buildLayout();
+      if (slots.length % 2 === 1) slots.pop();
+      const work = slots.map(s => ({ ...s, removed: false, face: null }));
+
+      let faceIdx = 0;
+      let ok = true;
+      while (work.some(t => !t.removed)) {
+        const live = work.filter(t => !t.removed);
+        const free = live.filter(t => isFree(t, work));
+        if (free.length < 2) { ok = false; break; }
+        const a = free[(Math.random() * free.length) | 0];
+        let b = a;
+        while (b === a) b = free[(Math.random() * free.length) | 0];
+        a.face = b.face = FACES[faceIdx++ % FACES.length];
+        a.removed = b.removed = true;
+      }
+      if (ok) {
+        tiles = work.map(t => ({ x: t.x, y: t.y, z: t.z, face: t.face, removed: false, el: null }));
+        return;
+      }
+    }
+  }
+
+  // ---------- Rendering ----------
+  function layoutDims() {
+    let maxX = 0, maxY = 0;
+    for (const t of tiles) { maxX = Math.max(maxX, t.x); maxY = Math.max(maxY, t.y); }
+    return { maxX, maxY };
+  }
+
+  function tileSize() {
+    // fit board width to viewport
+    const { maxX } = layoutDims();
+    const cols = (maxX + 2) / 2;              // number of tile columns
+    const avail = Math.min(window.innerWidth - 24, 700);
+    let w = Math.floor(avail / cols);
+    w = Math.max(30, Math.min(w, 52));
+    return { w, h: Math.round(w * 1.32) };
+  }
+
+  function render() {
+    const { w, h } = tileSize();
+    const half = { x: w / 2, y: h / 2 };
+    const zLift = 5;
+    const { maxX, maxY } = layoutDims();
+    boardEl.innerHTML = "";
+    boardEl.style.width = ((maxX / 2) * w + w + 8) + "px";
+    boardEl.style.height = ((maxY / 2) * h + h + 8 + zLift * 3) + "px";
+
+    // draw bottom layers first
+    const order = tiles.filter(t => !t.removed)
+      .sort((a, b) => a.z - b.z || a.y - b.y || a.x - b.x);
+
+    for (const t of order) {
+      const el = document.createElement("div");
+      el.className = "tile";
+      const left = (t.x / 2) * w - t.z * 3;
+      const top = (t.y / 2) * h - t.z * zLift;
+      el.style.left = left + "px";
+      el.style.top = top + "px";
+      el.style.width = w + "px";
+      el.style.height = h + "px";
+      el.style.zIndex = t.z * 100 + t.y;
+      el.style.fontSize = Math.round(h * 0.62) + "px";
+      el.innerHTML = "<span>" + t.face + "</span>";
+
+      const free = isFree(t, tiles);
+      el.classList.add(free ? "free" : "blocked");
+      if (t === selected) el.classList.add("sel");
+      el.addEventListener("click", () => clickTile(t));
+      t.el = el;
+      boardEl.appendChild(el);
+    }
+    updateStatus();
+  }
+
+  function clickTile(t) {
+    if (t.removed || !isFree(t, tiles)) return;
+    if (selected === t) { selected = null; render(); return; }
+    if (!selected) { selected = t; render(); return; }
+    if (selected.face === t.face) {
+      // match!
+      history.push([selected, t]);
+      selected.removed = true;
+      t.removed = true;
+      selected = null;
+      render();
+      checkEnd();
+    } else {
+      selected = t; // switch selection
+      render();
+    }
+  }
+
+  function freePairs() {
+    const free = tiles.filter(t => !t.removed && isFree(t, tiles));
+    const byFace = {};
+    for (const t of free) (byFace[t.face] ||= []).push(t);
+    const pairs = [];
+    for (const f in byFace) if (byFace[f].length >= 2) pairs.push([byFace[f][0], byFace[f][1]]);
+    return pairs;
+  }
+
+  function remaining() { return tiles.filter(t => !t.removed).length; }
+
+  function checkEnd() {
+    if (remaining() === 0) {
+      statusEl.textContent = "🎉 Geschafft! Alle Steine abgeräumt!";
+      statusEl.className = "status win";
+      return;
+    }
+    if (freePairs().length === 0) {
+      statusEl.textContent = "Keine Züge mehr möglich – „Mischen“ hilft weiter.";
+      statusEl.className = "status";
+    }
+  }
+
+  function updateStatus() {
+    if (remaining() === 0) return;
+    if (statusEl.className.includes("win")) return;
+    const pairs = freePairs().length;
+    statusEl.className = "status";
+    statusEl.textContent = "Steine übrig: " + remaining() + " · mögliche Züge: " + pairs;
+  }
+
+  // ---------- Buttons ----------
+  document.getElementById("newBtn").addEventListener("click", newGame);
+
+  document.getElementById("undoBtn").addEventListener("click", () => {
+    const last = history.pop();
+    if (!last) return;
+    last[0].removed = false;
+    last[1].removed = false;
+    selected = null;
+    statusEl.className = "status";
+    render();
+  });
+
+  document.getElementById("hintBtn").addEventListener("click", () => {
+    const pairs = freePairs();
+    if (!pairs.length) { checkEnd(); return; }
+    render();
+    const [a, b] = pairs[(Math.random() * pairs.length) | 0];
+    a.el && a.el.classList.add("hint");
+    b.el && b.el.classList.add("hint");
+  });
+
+  // Reshuffle the faces of the remaining tiles into a still-solvable arrangement.
+  document.getElementById("shuffleBtn").addEventListener("click", () => {
+    const live = tiles.filter(t => !t.removed);
+    if (live.length < 2) return;
+    // re-run the solvable assignment over the remaining slots
+    const work = live.map(t => ({ ref: t, x: t.x, y: t.y, z: t.z, removed: false }));
+    let faceFaces = live.map(t => t.face);
+    // collect available faces as a multiset, reassign via free-pair removal
+    let assignOk = true;
+    const pool = faceFaces.slice();
+    const lookup = work;
+    function freeIn(tile) {
+      const alive = lookup.filter(t => !t.removed && t !== tile);
+      if (alive.some(t => t.z === tile.z + 1 && Math.abs(t.x - tile.x) < 2 && Math.abs(t.y - tile.y) < 2)) return false;
+      const lb = alive.some(t => t.z === tile.z && t.x === tile.x - 2 && Math.abs(t.y - tile.y) < 2);
+      const rb = alive.some(t => t.z === tile.z && t.x === tile.x + 2 && Math.abs(t.y - tile.y) < 2);
+      return !lb || !rb;
+    }
+    // build a queue of faces in pairs
+    const faceCount = {};
+    for (const f of pool) faceCount[f] = (faceCount[f] || 0) + 1;
+    const pairFaces = [];
+    for (const f in faceCount) {
+      const n = Math.floor(faceCount[f] / 2);
+      for (let i = 0; i < n; i++) pairFaces.push(f);
+    }
+    shuffleArr(pairFaces);
+    let pi = 0;
+    while (lookup.some(t => !t.removed)) {
+      const alive = lookup.filter(t => !t.removed);
+      const free = alive.filter(freeIn);
+      if (free.length < 2 || pi >= pairFaces.length) { assignOk = false; break; }
+      const a = free[(Math.random() * free.length) | 0];
+      let b = a; while (b === a) b = free[(Math.random() * free.length) | 0];
+      a.ref._newFace = b.ref._newFace = pairFaces[pi++];
+      a.removed = b.removed = true;
+    }
+    if (assignOk) {
+      for (const t of live) { t.face = t._newFace; delete t._newFace; }
+      selected = null;
+      statusEl.className = "status";
+      render();
+    }
+  });
+
+  function shuffleArr(a) {
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = (Math.random() * (i + 1)) | 0;
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  window.addEventListener("resize", () => { if (tiles.length) render(); });
+
+  function newGame() {
+    generate();
+    selected = null;
+    history = [];
+    statusEl.className = "status";
+    render();
+  }
+
+  newGame();
+})();
+</script>
+</body>
+</html>

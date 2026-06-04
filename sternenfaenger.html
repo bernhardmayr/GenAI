@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Sternenfänger 🌟</title>
+<style>
+  :root {
+    --bg1: #1a1a2e;
+    --bg2: #16213e;
+    --accent: #ffd166;
+    --good: #06d6a0;
+    --bad: #ef476f;
+    --text: #e8e8f0;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: linear-gradient(160deg, var(--bg1), var(--bg2));
+    color: var(--text);
+    overflow: hidden;
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: none;
+  }
+  #wrap {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  canvas {
+    display: block;
+    background: radial-gradient(circle at 50% 0%, #243b6b 0%, var(--bg1) 70%);
+    box-shadow: 0 0 60px rgba(0,0,0,0.6);
+    border-radius: 12px;
+    max-width: 100%;
+    max-height: 100%;
+  }
+  #hud {
+    position: absolute;
+    top: 14px;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: space-between;
+    padding: 0 22px;
+    font-size: 20px;
+    font-weight: 700;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    pointer-events: none;
+  }
+  #hud .label { font-size: 12px; opacity: 0.6; font-weight: 600; letter-spacing: 1px; }
+  .lives { color: var(--bad); letter-spacing: 2px; }
+  .score { color: var(--accent); }
+  #overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    background: rgba(13, 16, 33, 0.82);
+    backdrop-filter: blur(4px);
+    border-radius: 12px;
+    gap: 18px;
+    padding: 24px;
+  }
+  #overlay.hidden { display: none; }
+  #overlay h1 {
+    font-size: clamp(34px, 8vw, 64px);
+    background: linear-gradient(90deg, var(--accent), var(--good));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    letter-spacing: 1px;
+  }
+  #overlay p { max-width: 420px; line-height: 1.5; opacity: 0.85; font-size: 15px; }
+  #overlay .big { font-size: 26px; opacity: 1; font-weight: 700; }
+  button {
+    font: inherit;
+    font-weight: 700;
+    font-size: 18px;
+    color: #1a1a2e;
+    background: linear-gradient(90deg, var(--accent), var(--good));
+    border: none;
+    border-radius: 999px;
+    padding: 14px 38px;
+    cursor: pointer;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+    box-shadow: 0 6px 20px rgba(255, 209, 102, 0.3);
+  }
+  button:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(255, 209, 102, 0.45); }
+  button:active { transform: translateY(0); }
+  .hint { font-size: 13px; opacity: 0.55; }
+</style>
+</head>
+<body>
+<a href="index.html" style="position:fixed;top:10px;left:12px;z-index:50;color:#8ecae6;text-decoration:none;font:14px system-ui;opacity:.85">← Spiele</a>
+<div id="wrap">
+  <canvas id="game"></canvas>
+  <div id="hud">
+    <div><div class="label">PUNKTE</div><div class="score" id="score">0</div></div>
+    <div style="text-align:center"><div class="label">LEVEL</div><div id="level">1</div></div>
+    <div style="text-align:right"><div class="label">LEBEN</div><div class="lives" id="lives">♥♥♥</div></div>
+  </div>
+  <div id="overlay">
+    <h1>Sternenfänger</h1>
+    <p>Fange die fallenden <b style="color:var(--accent)">Sterne ⭐</b> mit deinem Korb.
+       Sammle <b style="color:var(--good)">grüne 🍀</b> für Extra-Leben –
+       weiche den <b style="color:var(--bad)">Bomben 💣</b> aus!</p>
+    <p class="hint">Steuern: Maus / Finger bewegen · oder ← → Pfeiltasten · Pause: P</p>
+    <button id="startBtn">Spiel starten</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  const canvas = document.getElementById("game");
+  const ctx = canvas.getContext("2d");
+  const overlay = document.getElementById("overlay");
+  const startBtn = document.getElementById("startBtn");
+  const scoreEl = document.getElementById("score");
+  const levelEl = document.getElementById("level");
+  const livesEl = document.getElementById("lives");
+
+  // Logical play-field size; canvas is scaled to fit the window.
+  const W = 480, H = 720;
+
+  function fitCanvas() {
+    const dpr = window.devicePixelRatio || 1;
+    const margin = 20;
+    const scale = Math.min(
+      (window.innerWidth - margin) / W,
+      (window.innerHeight - margin) / H
+    );
+    canvas.style.width = Math.round(W * scale) + "px";
+    canvas.style.height = Math.round(H * scale) + "px";
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener("resize", fitCanvas);
+  fitCanvas();
+
+  // ---- Game state ----
+  const HIGH_KEY = "sternenfaenger_highscore";
+  let highscore = parseInt(localStorage.getItem(HIGH_KEY) || "0", 10) || 0;
+
+  const basket = { x: W / 2, y: H - 60, w: 90, h: 26, target: W / 2 };
+  let items = [];
+  let particles = [];
+  let stars = [];          // background twinkles
+  let score, lives, level, spawnTimer, spawnInterval, running, paused, gameOver, comboMsg;
+
+  function makeStars() {
+    stars = [];
+    for (let i = 0; i < 60; i++) {
+      stars.push({
+        x: Math.random() * W,
+        y: Math.random() * H,
+        r: Math.random() * 1.6 + 0.4,
+        tw: Math.random() * Math.PI * 2,
+        sp: Math.random() * 0.04 + 0.01
+      });
+    }
+  }
+
+  function reset() {
+    items = [];
+    particles = [];
+    score = 0;
+    lives = 3;
+    level = 1;
+    spawnInterval = 900;
+    spawnTimer = 0;
+    paused = false;
+    gameOver = false;
+    comboMsg = null;
+    basket.x = basket.target = W / 2;
+    makeStars();
+    updateHud();
+  }
+
+  function updateHud() {
+    scoreEl.textContent = score;
+    levelEl.textContent = level;
+    livesEl.textContent = lives > 0 ? "♥".repeat(lives) : "—";
+  }
+
+  // ---- Item types ----
+  const TYPES = {
+    star:  { emoji: "⭐", points: 10, r: 16, weight: 70 },
+    gem:   { emoji: "💎", points: 25, r: 15, weight: 16 },
+    clover:{ emoji: "🍀", points: 5,  r: 15, weight: 6, heal: true },
+    bomb:  { emoji: "💣", points: 0,  r: 17, weight: 22, bomb: true }
+  };
+
+  function pickType() {
+    // Bombs get a little more common as levels rise.
+    const table = [];
+    for (const key in TYPES) {
+      let w = TYPES[key].weight;
+      if (key === "bomb") w += level * 3;
+      for (let i = 0; i < w; i++) table.push(key);
+    }
+    return table[(Math.random() * table.length) | 0];
+  }
+
+  function spawnItem() {
+    const key = pickType();
+    const t = TYPES[key];
+    items.push({
+      key, ...t,
+      x: t.r + Math.random() * (W - 2 * t.r),
+      y: -t.r,
+      vy: 1.6 + level * 0.35 + Math.random() * 0.8,
+      vx: (Math.random() - 0.5) * 0.6,
+      rot: 0,
+      vrot: (Math.random() - 0.5) * 0.08
+    });
+  }
+
+  function burst(x, y, color, n) {
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const s = Math.random() * 4 + 1;
+      particles.push({
+        x, y,
+        vx: Math.cos(a) * s,
+        vy: Math.sin(a) * s - 1,
+        life: 1,
+        color
+      });
+    }
+  }
+
+  function flash(text, color) {
+    comboMsg = { text, color, life: 1, y: basket.y - 40 };
+  }
+
+  // ---- Input ----
+  function pointerX(clientX) {
+    const rect = canvas.getBoundingClientRect();
+    return ((clientX - rect.left) / rect.width) * W;
+  }
+  canvas.addEventListener("mousemove", e => { basket.target = pointerX(e.clientX); });
+  canvas.addEventListener("touchmove", e => {
+    e.preventDefault();
+    basket.target = pointerX(e.touches[0].clientX);
+  }, { passive: false });
+  canvas.addEventListener("touchstart", e => {
+    basket.target = pointerX(e.touches[0].clientX);
+  }, { passive: true });
+
+  const keys = {};
+  window.addEventListener("keydown", e => {
+    keys[e.key] = true;
+    if ((e.key === "p" || e.key === "P") && running && !gameOver) togglePause();
+    if (e.key === " " && (!running || gameOver)) startGame();
+  });
+  window.addEventListener("keyup", e => { keys[e.key] = false; });
+
+  function togglePause() {
+    paused = !paused;
+    if (paused) {
+      showOverlay("Pause", "Druck P oder klick, um weiterzuspielen", "Weiter", false);
+    } else {
+      overlay.classList.add("hidden");
+    }
+  }
+
+  // ---- Game loop ----
+  let last = 0;
+  function loop(ts) {
+    const dt = Math.min(40, ts - last) || 16;
+    last = ts;
+    if (running && !paused && !gameOver) update(dt);
+    render();
+    requestAnimationFrame(loop);
+  }
+
+  function update(dt) {
+    // Keyboard movement
+    const kbSpeed = 7;
+    if (keys["ArrowLeft"]) basket.target -= kbSpeed;
+    if (keys["ArrowRight"]) basket.target += kbSpeed;
+    basket.target = Math.max(basket.w / 2, Math.min(W - basket.w / 2, basket.target));
+    basket.x += (basket.target - basket.x) * 0.25;
+
+    // Spawning
+    spawnTimer += dt;
+    if (spawnTimer >= spawnInterval) {
+      spawnTimer = 0;
+      spawnItem();
+    }
+
+    // Items
+    for (let i = items.length - 1; i >= 0; i--) {
+      const it = items[i];
+      it.y += it.vy * (dt / 16);
+      it.x += it.vx * (dt / 16);
+      if (it.x < it.r || it.x > W - it.r) it.vx *= -1;
+      it.rot += it.vrot;
+
+      // Catch test
+      const caught =
+        it.y + it.r >= basket.y - basket.h / 2 &&
+        it.y - it.r <= basket.y + basket.h / 2 &&
+        it.x >= basket.x - basket.w / 2 - 6 &&
+        it.x <= basket.x + basket.w / 2 + 6;
+
+      if (caught) {
+        items.splice(i, 1);
+        if (it.bomb) {
+          loseLife();
+          burst(it.x, it.y, "#ef476f", 26);
+          flash("AUTSCH!", "#ef476f");
+        } else if (it.heal) {
+          if (lives < 5) lives++;
+          score += it.points;
+          burst(it.x, it.y, "#06d6a0", 20);
+          flash("+LEBEN", "#06d6a0");
+          updateHud();
+        } else {
+          score += it.points;
+          burst(it.x, it.y, "#ffd166", 16);
+          if (it.key === "gem") flash("+" + it.points + "!", "#8ecae6");
+          updateHud();
+          maybeLevelUp();
+        }
+        continue;
+      }
+
+      // Missed (fell off bottom)
+      if (it.y - it.r > H) {
+        items.splice(i, 1);
+        if (!it.bomb && !it.heal) {
+          loseLife();
+          flash("VERPASST", "#ef476f");
+        }
+      }
+    }
+
+    // Particles
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.15;
+      p.life -= 0.02;
+      if (p.life <= 0) particles.splice(i, 1);
+    }
+
+    if (comboMsg) {
+      comboMsg.y -= 0.6;
+      comboMsg.life -= 0.015;
+      if (comboMsg.life <= 0) comboMsg = null;
+    }
+
+    // Twinkle background
+    for (const s of stars) s.tw += s.sp;
+  }
+
+  function loseLife() {
+    lives--;
+    updateHud();
+    if (lives <= 0) endGame();
+  }
+
+  function maybeLevelUp() {
+    const newLevel = Math.floor(score / 150) + 1;
+    if (newLevel > level) {
+      level = newLevel;
+      spawnInterval = Math.max(320, 900 - level * 55);
+      updateHud();
+      flash("LEVEL " + level, "#ffd166");
+    }
+  }
+
+  // ---- Rendering ----
+  function render() {
+    ctx.clearRect(0, 0, W, H);
+
+    // Background stars
+    for (const s of stars) {
+      const a = 0.3 + Math.sin(s.tw) * 0.3;
+      ctx.globalAlpha = Math.max(0, a);
+      ctx.fillStyle = "#fff";
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // Items
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    for (const it of items) {
+      ctx.save();
+      ctx.translate(it.x, it.y);
+      ctx.rotate(it.rot);
+      ctx.font = (it.r * 2) + "px serif";
+      ctx.fillText(it.emoji, 0, 1);
+      ctx.restore();
+    }
+
+    // Particles
+    for (const p of particles) {
+      ctx.globalAlpha = Math.max(0, p.life);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
+    }
+    ctx.globalAlpha = 1;
+
+    // Basket
+    drawBasket();
+
+    // Combo message
+    if (comboMsg) {
+      ctx.globalAlpha = Math.max(0, comboMsg.life);
+      ctx.fillStyle = comboMsg.color;
+      ctx.font = "bold 22px system-ui";
+      ctx.fillText(comboMsg.text, basket.x, comboMsg.y);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function drawBasket() {
+    const x = basket.x, y = basket.y, w = basket.w, h = basket.h;
+    ctx.save();
+    // Glow
+    ctx.shadowColor = "rgba(255, 209, 102, 0.6)";
+    ctx.shadowBlur = 18;
+    // Body
+    const grad = ctx.createLinearGradient(0, y - h, 0, y + h);
+    grad.addColorStop(0, "#ffe29a");
+    grad.addColorStop(1, "#d98c2b");
+    ctx.fillStyle = grad;
+    roundRect(x - w / 2, y - h / 2, w, h, 10);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    // Rim
+    ctx.fillStyle = "#fff4d6";
+    roundRect(x - w / 2, y - h / 2, w, 7, 6);
+    ctx.fill();
+    // Weave lines
+    ctx.strokeStyle = "rgba(120,70,20,0.5)";
+    ctx.lineWidth = 2;
+    for (let i = 1; i < 5; i++) {
+      const lx = x - w / 2 + (w / 5) * i;
+      ctx.beginPath();
+      ctx.moveTo(lx, y - h / 2 + 7);
+      ctx.lineTo(lx, y + h / 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  // ---- Overlay / flow ----
+  function showOverlay(title, html, btnText, isStart) {
+    overlay.innerHTML = "";
+    const h1 = document.createElement("h1");
+    h1.textContent = title;
+    const p = document.createElement("p");
+    p.innerHTML = html;
+    const btn = document.createElement("button");
+    btn.textContent = btnText;
+    overlay.append(h1, p, btn);
+    overlay.classList.remove("hidden");
+    btn.onclick = () => {
+      if (isStart) startGame();
+      else togglePause();
+    };
+  }
+
+  function startGame() {
+    overlay.classList.add("hidden");
+    reset();
+    running = true;
+  }
+
+  function endGame() {
+    gameOver = true;
+    running = false;
+    const isRecord = score > highscore;
+    if (isRecord) {
+      highscore = score;
+      localStorage.setItem(HIGH_KEY, String(highscore));
+    }
+    overlay.innerHTML = "";
+    const h1 = document.createElement("h1");
+    h1.textContent = "Game Over";
+    const big = document.createElement("p");
+    big.className = "big";
+    big.innerHTML = "Punkte: <b style='color:var(--accent)'>" + score + "</b>";
+    const rec = document.createElement("p");
+    rec.innerHTML = isRecord
+      ? "🏆 <b style='color:var(--good)'>Neuer Highscore!</b>"
+      : "Bester: <b>" + highscore + "</b> · Level " + level;
+    const btn = document.createElement("button");
+    btn.textContent = "Nochmal spielen";
+    btn.onclick = startGame;
+    const hint = document.createElement("p");
+    hint.className = "hint";
+    hint.textContent = "Tipp: Leertaste zum Neustarten";
+    overlay.append(h1, big, rec, btn, hint);
+    overlay.classList.remove("hidden");
+  }
+
+  // Click the dimmed overlay to resume from pause
+  overlay.addEventListener("click", e => {
+    if (paused && e.target === overlay) togglePause();
+  });
+
+  startBtn.onclick = startGame;
+  running = false;
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
