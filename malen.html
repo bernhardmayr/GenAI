@@ -92,7 +92,16 @@
     max-width: min(1100px, 96vw);
     touch-action: none;
   }
-  canvas { display: block; width: 100%; height: auto; cursor: crosshair; }
+  /* aspect-ratio explizit setzen: iOS-Safari berechnet die Höhe bei
+     width:100%/height:auto für <canvas> sonst nicht und lässt es zu
+     einem dünnen Streifen zusammenfallen. */
+  canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1100 / 920;
+    cursor: crosshair;
+  }
 
   .dinos { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
   button.dino {
