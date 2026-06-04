@@ -88,8 +88,8 @@
     border-radius: 16px;
     box-shadow: 0 18px 40px rgba(0,0,0,0.45);
     padding: 0; overflow: hidden;
-    width: 100%;
-    max-width: min(1100px, 96vw);
+    width: fit-content;
+    max-width: 100%;
     touch-action: none;
   }
   /* aspect-ratio explizit setzen: iOS-Safari berechnet die Höhe bei
@@ -182,7 +182,7 @@
     </div>
   </div>
 
-  <footer>Tipp: Mit dem 🪣 <b>Füllen</b>-Werkzeug malst du ganze Flächen eines Ausmalbilds mit einem Klick aus. Funktioniert mit Maus und Finger.</footer>
+  <footer>Tipp: Mit dem 🪣 <b>Füllen</b>-Werkzeug malst du ganze Flächen eines Ausmalbilds mit einem Klick aus. Funktioniert mit Maus und Finger.<span id="diag" style="display:block;opacity:0.7;margin-top:4px;"></span></footer>
 
 <script>
 "use strict";
@@ -194,19 +194,28 @@
   // ---------- Anzeigehöhe hart setzen ----------
   // Manche Browser (v. a. iOS-Safari) berechnen die Höhe eines <canvas>
   // mit width:100%/height:auto nicht und lassen es zu einem dünnen Streifen
-  // zusammenfallen. Deshalb setzen wir die Anzeigehöhe selbst – passend zur
-  // tatsächlichen Anzeigebreite, seitenverhältnistreu. Der Zeichenpuffer
-  // bleibt konstant W×H, pos() rechnet das per Bounding-Rect um.
+  // zusammenfallen. Deshalb setzen wir Breite UND Höhe der Anzeige selbst,
+  // hart in px, abgeleitet aus der Fensterbreite (immer ein sinnvoller Wert,
+  // nie 0). Der Zeichenpuffer bleibt konstant W×H; pos() rechnet per Rect um.
   function fitCanvas() {
-    const dispW = canvas.clientWidth ||
-      (canvas.parentElement ? canvas.parentElement.clientWidth : W);
-    if (dispW) canvas.style.height = (dispW * H / W) + "px";
+    const vw = document.documentElement.clientWidth || window.innerWidth || 360;
+    const cssW = Math.max(240, Math.min(1100, vw - 24));
+    const cssH = Math.round(cssW * H / W);
+    canvas.style.width = cssW + "px";
+    canvas.style.height = cssH + "px";
+    const d = document.getElementById("diag");
+    if (d) d.textContent = " · v11 · Leinwand " + Math.round(cssW) + "×" + cssH +
+      " px · gemessen " + Math.round(canvas.getBoundingClientRect().width) +
+      "×" + Math.round(canvas.getBoundingClientRect().height);
   }
   window.addEventListener("resize", fitCanvas);
   window.addEventListener("orientationchange", fitCanvas);
-  // einmal verzögert, falls Layout/Schriften noch nicht final sind
-  setTimeout(fitCanvas, 0);
+  window.addEventListener("load", fitCanvas);
+  // mehrfach, falls Layout/Schriften beim ersten Lauf noch nicht final sind
   fitCanvas();
+  requestAnimationFrame(fitCanvas);
+  setTimeout(fitCanvas, 100);
+  setTimeout(fitCanvas, 500);
 
   // ---------- Zustand ----------
   const state = {
