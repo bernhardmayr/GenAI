@@ -37,7 +37,7 @@
     border-radius: 16px;
     padding: 12px;
     width: 100%;
-    max-width: 880px;
+    max-width: 1100px;
   }
 
   .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center; }
@@ -88,7 +88,10 @@
     border-radius: 16px;
     box-shadow: 0 18px 40px rgba(0,0,0,0.45);
     padding: 0; overflow: hidden;
-    width: 100%; max-width: 880px;
+    width: 100%;
+    /* So breit wie möglich – aber gedeckelt, damit die (seitenverhältnis-
+       treue) Höhe ins Sichtfenster passt. Seitenverhältnis = 1100/780. */
+    max-width: min(1100px, calc((100vh - 90px) * 1.41));
     touch-action: none;
   }
   canvas { display: block; width: 100%; height: auto; cursor: crosshair; }
@@ -153,7 +156,7 @@
 
   <!-- Leinwand -->
   <div class="stage">
-    <canvas id="canvas" width="880" height="620"></canvas>
+    <canvas id="canvas" width="1100" height="780"></canvas>
   </div>
 
   <!-- Ausmalbilder -->
@@ -469,12 +472,18 @@
   });
 
   // ---------- Ausmalbilder (Dino-Outlines) ----------
+  // Die Vorlagen sind im Koordinatenraum 880×620 gezeichnet und werden
+  // formatfüllend auf die (größere) Leinwand skaliert.
+  const ART_W = 880, ART_H = 620;
   function newSheet(drawFn) {
     pushUndo();
     fillWhite();
     ctx.save();
+    const s = Math.min(W / ART_W, H / ART_H);
+    ctx.translate((W - ART_W * s) / 2, (H - ART_H * s) / 2);
+    ctx.scale(s, s);
     ctx.strokeStyle = "#222";
-    ctx.lineWidth = 4;
+    ctx.lineWidth = 4 / s;
     ctx.lineJoin = "round";
     ctx.lineCap = "round";
     ctx.fillStyle = "transparent";
