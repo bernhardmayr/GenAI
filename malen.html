@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mal-Atelier 🎨</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: linear-gradient(160deg, #1a1a2e, #16213e);
+    color: #e8e8f0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 14px 12px 24px;
+    gap: 14px;
+    min-height: 100vh;
+  }
+  header { text-align: center; }
+  h1 {
+    font-size: clamp(24px, 6vw, 40px);
+    background: linear-gradient(90deg, #ffd166, #06d6a0, #8ecae6, #ef476f);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    letter-spacing: 1px;
+  }
+  header p { opacity: 0.6; font-size: 13px; margin-top: 4px; }
+  a.back { position: fixed; top: 12px; left: 14px; color: #8ecae6; text-decoration: none; font-size: 14px; opacity: 0.8; z-index: 5; }
+  a.back:hover { opacity: 1; }
+
+  .panel {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    padding: 12px;
+    width: 100%;
+    max-width: 880px;
+  }
+
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center; }
+  .row + .row { margin-top: 10px; }
+  .group { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: center; }
+  .sep { width: 1px; align-self: stretch; background: rgba(255,255,255,0.12); margin: 0 2px; }
+
+  .label { font-size: 12px; opacity: 0.55; margin-right: 2px; }
+
+  /* Colour swatches */
+  .swatches { display: flex; flex-wrap: wrap; gap: 7px; justify-content: center; }
+  .swatch {
+    width: 30px; height: 30px; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.25);
+    cursor: pointer; transition: transform 0.1s ease, border-color 0.1s ease;
+  }
+  .swatch:hover { transform: scale(1.12); }
+  .swatch.active { border-color: #fff; transform: scale(1.18); box-shadow: 0 0 0 3px rgba(255,255,255,0.18); }
+
+  /* Tool / action buttons */
+  button.tool, label.tool {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.12);
+    color: #e8e8f0;
+    border-radius: 11px;
+    padding: 9px 12px;
+    font-size: 14px; cursor: pointer;
+    transition: background 0.12s ease, border-color 0.12s ease, transform 0.08s ease;
+    user-select: none;
+  }
+  button.tool:hover, label.tool:hover { background: rgba(255,255,255,0.13); }
+  button.tool:active { transform: scale(0.95); }
+  button.tool.active { background: rgba(255,209,102,0.22); border-color: rgba(255,209,102,0.6); }
+  button.tool.primary { background: rgba(6,214,160,0.18); border-color: rgba(6,214,160,0.5); }
+  button.tool.danger:hover { background: rgba(239,71,111,0.2); border-color: rgba(239,71,111,0.5); }
+
+  input[type="color"] {
+    width: 38px; height: 34px; border: none; background: none; cursor: pointer; padding: 0; border-radius: 8px;
+  }
+  input[type="range"] { width: 130px; accent-color: #06d6a0; cursor: pointer; }
+
+  .sizeVal { font-size: 13px; opacity: 0.7; width: 38px; text-align: left; }
+
+  /* Canvas */
+  .stage {
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 18px 40px rgba(0,0,0,0.45);
+    padding: 0; overflow: hidden;
+    width: 100%; max-width: 880px;
+    touch-action: none;
+  }
+  canvas { display: block; width: 100%; height: auto; cursor: crosshair; }
+
+  .dinos { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  button.dino {
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+    color: #e8e8f0; border-radius: 11px; padding: 8px 12px; font-size: 14px; cursor: pointer;
+    transition: background 0.12s ease, transform 0.08s ease;
+  }
+  button.dino:hover { background: rgba(142,202,230,0.18); }
+  button.dino:active { transform: scale(0.95); }
+
+  footer { opacity: 0.4; font-size: 12px; text-align: center; max-width: 600px; }
+</style>
+</head>
+<body>
+  <a class="back" href="index.html">← Spiele</a>
+  <header>
+    <h1>Mal-Atelier</h1>
+    <p>Mal frei drauflos oder male einen Dino aus 🦕</p>
+  </header>
+
+  <!-- Werkzeugleiste -->
+  <div class="panel">
+    <div class="row">
+      <div class="swatches" id="swatches"></div>
+      <div class="sep"></div>
+      <label class="tool" title="Eigene Farbe wählen">
+        🎨 <input type="color" id="customColor" value="#ff5da2">
+      </label>
+    </div>
+
+    <div class="row">
+      <div class="group">
+        <span class="label">Werkzeug</span>
+        <button class="tool active" data-tool="brush" title="Pinsel (weich)">🖌️ Pinsel</button>
+        <button class="tool" data-tool="pencil" title="Buntstift (hart)">✏️ Stift</button>
+        <button class="tool" data-tool="marker" title="Filzstift (kräftig)">🖊️ Filzer</button>
+        <button class="tool" data-tool="crayon" title="Wachsmalstift (körnig)">🖍️ Wachs</button>
+        <button class="tool" data-tool="spray" title="Sprühdose">💨 Spray</button>
+        <button class="tool" data-tool="fill" title="Flächen füllen">🪣 Füllen</button>
+        <button class="tool" data-tool="rainbow" title="Regenbogen-Pinsel">🌈 Regenbogen</button>
+        <button class="tool" data-tool="eraser" title="Radiergummi">🧽 Radierer</button>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="group">
+        <span class="label">Größe</span>
+        <input type="range" id="size" min="1" max="60" value="10">
+        <span class="sizeVal" id="sizeVal">10 px</span>
+      </div>
+      <div class="sep"></div>
+      <div class="group">
+        <button class="tool" id="undo" title="Rückgängig">↩️ Zurück</button>
+        <button class="tool danger" id="clear" title="Alles löschen">🗑️ Leeren</button>
+        <button class="tool primary" id="save" title="Als Bild speichern">💾 Speichern</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Leinwand -->
+  <div class="stage">
+    <canvas id="canvas" width="880" height="620"></canvas>
+  </div>
+
+  <!-- Ausmalbilder -->
+  <div class="panel">
+    <div class="row">
+      <span class="label">Ausmalbild laden</span>
+      <div class="dinos" id="dinos">
+        <button class="dino" data-dino="rex">🦖 T-Rex</button>
+        <button class="dino" data-dino="stego">🦕 Stegosaurus</button>
+        <button class="dino" data-dino="tri">🦏 Triceratops</button>
+        <button class="dino" data-dino="bronto">🦕 Langhals</button>
+        <button class="dino" data-dino="ptero">🦅 Flugsaurier</button>
+        <button class="dino" data-dino="egg">🥚 Dino-Ei</button>
+        <button class="dino" data-dino="blank">⬜ Leeres Blatt</button>
+      </div>
+    </div>
+  </div>
+
+  <footer>Tipp: Mit dem 🪣 <b>Füllen</b>-Werkzeug malst du ganze Flächen eines Ausmalbilds mit einem Klick aus. Funktioniert mit Maus und Finger.</footer>
+
+<script>
+"use strict";
+(function () {
+  const canvas = document.getElementById("canvas");
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  const W = canvas.width, H = canvas.height;
+
+  // ---------- Zustand ----------
+  const state = {
+    tool: "brush",
+    color: "#ff5da2",
+    size: 10,
+    hue: 0,          // für Regenbogen
+    drawing: false,
+    last: null,
+  };
+
+  const undoStack = [];
+  const MAX_UNDO = 25;
+
+  function pushUndo() {
+    try {
+      undoStack.push(ctx.getImageData(0, 0, W, H));
+      if (undoStack.length > MAX_UNDO) undoStack.shift();
+    } catch (e) { /* ignore */ }
+  }
+
+  // ---------- Hintergrund / Leinwand füllen ----------
+  function fillWhite() {
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, W, H);
+  }
+  fillWhite();
+
+  // ---------- Farbpalette ----------
+  const palette = [
+    "#000000", "#6d4c41", "#ef476f", "#ff5da2", "#ff8c42", "#ffd166",
+    "#fff35c", "#a8e063", "#06d6a0", "#118ab2", "#8ecae6", "#3a86ff",
+    "#7b2cbf", "#c77dff", "#f4978e", "#ffffff"
+  ];
+  const swatchEls = [];
+  const swatchWrap = document.getElementById("swatches");
+  palette.forEach((c, i) => {
+    const el = document.createElement("div");
+    el.className = "swatch" + (i === 3 ? " active" : "");
+    el.style.background = c;
+    el.title = c;
+    el.addEventListener("click", () => selectColor(c, el));
+    swatchWrap.appendChild(el);
+    swatchEls.push(el);
+  });
+
+  function selectColor(c, el) {
+    state.color = c;
+    swatchEls.forEach(s => s.classList.remove("active"));
+    if (el) el.classList.add("active");
+    document.getElementById("customColor").value = toHex(c);
+    // Beim Farbwählen sinnvoll: weg vom Radierer
+    if (state.tool === "eraser") setTool("brush");
+  }
+
+  function toHex(c) {
+    if (c[0] === "#" && c.length === 7) return c;
+    return "#000000";
+  }
+
+  document.getElementById("customColor").addEventListener("input", (e) => {
+    selectColor(e.target.value, null);
+  });
+
+  // ---------- Werkzeuge ----------
+  const toolBtns = Array.from(document.querySelectorAll("button.tool[data-tool]"));
+  function setTool(name) {
+    state.tool = name;
+    toolBtns.forEach(b => b.classList.toggle("active", b.dataset.tool === name));
+    canvas.style.cursor = (name === "fill") ? "cell" : "crosshair";
+  }
+  toolBtns.forEach(b => b.addEventListener("click", () => setTool(b.dataset.tool)));
+
+  const sizeEl = document.getElementById("size");
+  const sizeVal = document.getElementById("sizeVal");
+  sizeEl.addEventListener("input", () => {
+    state.size = parseInt(sizeEl.value, 10);
+    sizeVal.textContent = state.size + " px";
+  });
+
+  // ---------- Koordinaten ----------
+  function pos(e) {
+    const r = canvas.getBoundingClientRect();
+    const p = (e.touches && e.touches[0]) ? e.touches[0] : e;
+    return {
+      x: (p.clientX - r.left) * (W / r.width),
+      y: (p.clientY - r.top) * (H / r.height),
+    };
+  }
+
+  // ---------- Zeichnen ----------
+  function strokeStyleFor() {
+    if (state.tool === "rainbow") {
+      state.hue = (state.hue + 6) % 360;
+      return "hsl(" + state.hue + ", 90%, 55%)";
+    }
+    if (state.tool === "eraser") return "#ffffff";
+    return state.color;
+  }
+
+  function drawSegment(a, b) {
+    const tool = state.tool;
+
+    if (tool === "spray") {
+      sprayDots(b);
+      return;
+    }
+
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+
+    if (tool === "pencil") {
+      ctx.globalAlpha = 1;
+      ctx.lineWidth = Math.max(1, state.size * 0.45);
+      ctx.strokeStyle = strokeStyleFor();
+    } else if (tool === "marker") {
+      ctx.globalAlpha = 0.85;
+      ctx.lineWidth = state.size;
+      ctx.strokeStyle = strokeStyleFor();
+    } else if (tool === "crayon") {
+      drawCrayon(a, b);
+      return;
+    } else if (tool === "rainbow") {
+      ctx.globalAlpha = 1;
+      ctx.lineWidth = state.size;
+      ctx.strokeStyle = strokeStyleFor();
+    } else if (tool === "eraser") {
+      ctx.globalAlpha = 1;
+      ctx.lineWidth = state.size * 1.4;
+      ctx.strokeStyle = "#ffffff";
+    } else { // brush
+      ctx.globalAlpha = 1;
+      ctx.lineWidth = state.size;
+      ctx.strokeStyle = strokeStyleFor();
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  function sprayDots(p) {
+    const density = Math.max(8, state.size * 1.4);
+    const radius = state.size;
+    ctx.fillStyle = strokeStyleFor();
+    ctx.globalAlpha = 0.8;
+    for (let i = 0; i < density; i++) {
+      const ang = Math.random() * Math.PI * 2;
+      const rr = Math.random() * radius;
+      const dx = Math.cos(ang) * rr;
+      const dy = Math.sin(ang) * rr;
+      ctx.beginPath();
+      ctx.arc(p.x + dx, p.y + dy, 0.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawCrayon(a, b) {
+    const steps = Math.max(1, Math.hypot(b.x - a.x, b.y - a.y) / 2);
+    ctx.fillStyle = strokeStyleFor();
+    for (let s = 0; s <= steps; s++) {
+      const t = s / steps;
+      const x = a.x + (b.x - a.x) * t;
+      const y = a.y + (b.y - a.y) * t;
+      const n = Math.max(3, state.size * 0.8);
+      for (let i = 0; i < n; i++) {
+        const ang = Math.random() * Math.PI * 2;
+        const rr = Math.random() * state.size * 0.5;
+        ctx.globalAlpha = 0.25 + Math.random() * 0.35;
+        ctx.beginPath();
+        ctx.arc(x + Math.cos(ang) * rr, y + Math.sin(ang) * rr, state.size * 0.12 + 0.4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ---------- Eimer / Flood Fill ----------
+  function hexToRgb(c) {
+    if (c[0] === "#") {
+      return [parseInt(c.slice(1,3),16), parseInt(c.slice(3,5),16), parseInt(c.slice(5,7),16)];
+    }
+    // hsl() für Regenbogen → über temporären Canvas
+    const t = document.createElement("canvas"); t.width = t.height = 1;
+    const tc = t.getContext("2d"); tc.fillStyle = c; tc.fillRect(0,0,1,1);
+    const d = tc.getImageData(0,0,1,1).data;
+    return [d[0], d[1], d[2]];
+  }
+
+  function floodFill(sx, sy, fillColor) {
+    sx = Math.round(sx); sy = Math.round(sy);
+    if (sx < 0 || sy < 0 || sx >= W || sy >= H) return;
+    const img = ctx.getImageData(0, 0, W, H);
+    const data = img.data;
+    const idx = (sy * W + sx) * 4;
+    const sr = data[idx], sg = data[idx+1], sb = data[idx+2], sa = data[idx+3];
+    const [fr, fg, fb] = fillColor;
+
+    // Schon die Zielfarbe? Nichts tun.
+    if (Math.abs(sr-fr) < 4 && Math.abs(sg-fg) < 4 && Math.abs(sb-fb) < 4 && sa === 255) return;
+
+    const tol = 48; // Toleranz, damit weiche Pinselränder/Outlines respektiert werden
+    const match = (i) => {
+      const dr = data[i]-sr, dg = data[i+1]-sg, db = data[i+2]-sb, da = data[i+3]-sa;
+      return (dr*dr + dg*dg + db*db + da*da) <= tol*tol;
+    };
+
+    const stack = [[sx, sy]];
+    while (stack.length) {
+      const [x, y] = stack.pop();
+      let nx = x;
+      // nach links wandern
+      while (nx >= 0 && match((y*W + nx)*4)) nx--;
+      nx++;
+      let up = false, down = false;
+      while (nx < W && match((y*W + nx)*4)) {
+        const i = (y*W + nx)*4;
+        data[i] = fr; data[i+1] = fg; data[i+2] = fb; data[i+3] = 255;
+        if (y > 0) {
+          const ai = ((y-1)*W + nx)*4;
+          if (match(ai)) { if (!up) { stack.push([nx, y-1]); up = true; } }
+          else up = false;
+        }
+        if (y < H-1) {
+          const bi = ((y+1)*W + nx)*4;
+          if (match(bi)) { if (!down) { stack.push([nx, y+1]); down = true; } }
+          else down = false;
+        }
+        nx++;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+
+  // ---------- Pointer-Handling ----------
+  function start(e) {
+    e.preventDefault();
+    const p = pos(e);
+    if (state.tool === "fill") {
+      pushUndo();
+      floodFill(p.x, p.y, hexToRgb(strokeStyleFor()));
+      return;
+    }
+    pushUndo();
+    state.drawing = true;
+    state.last = p;
+    // Punkt setzen (für Klick ohne Bewegung)
+    drawSegment(p, { x: p.x + 0.01, y: p.y + 0.01 });
+  }
+  function move(e) {
+    if (!state.drawing) return;
+    e.preventDefault();
+    const p = pos(e);
+    drawSegment(state.last, p);
+    state.last = p;
+  }
+  function end() {
+    state.drawing = false;
+    state.last = null;
+  }
+
+  canvas.addEventListener("mousedown", start);
+  canvas.addEventListener("mousemove", move);
+  window.addEventListener("mouseup", end);
+  canvas.addEventListener("touchstart", start, { passive: false });
+  canvas.addEventListener("touchmove", move, { passive: false });
+  canvas.addEventListener("touchend", end);
+  canvas.addEventListener("touchcancel", end);
+
+  // ---------- Aktionen ----------
+  document.getElementById("undo").addEventListener("click", () => {
+    if (!undoStack.length) return;
+    ctx.putImageData(undoStack.pop(), 0, 0);
+  });
+  document.getElementById("clear").addEventListener("click", () => {
+    pushUndo();
+    fillWhite();
+  });
+  document.getElementById("save").addEventListener("click", () => {
+    const a = document.createElement("a");
+    a.download = "mein-bild.png";
+    a.href = canvas.toDataURL("image/png");
+    a.click();
+  });
+
+  // ---------- Ausmalbilder (Dino-Outlines) ----------
+  function newSheet(drawFn) {
+    pushUndo();
+    fillWhite();
+    ctx.save();
+    ctx.strokeStyle = "#222";
+    ctx.lineWidth = 4;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.fillStyle = "transparent";
+    drawFn(ctx);
+    ctx.restore();
+  }
+
+  // Hilfsfunktion: glatte geschlossene Kurve durch Punkte
+  function blob(c, pts, close = true) {
+    c.beginPath();
+    c.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length - 1; i++) {
+      const xc = (pts[i][0] + pts[i+1][0]) / 2;
+      const yc = (pts[i][1] + pts[i+1][1]) / 2;
+      c.quadraticCurveTo(pts[i][0], pts[i][1], xc, yc);
+    }
+    const last = pts[pts.length - 1];
+    if (close) {
+      const xc = (last[0] + pts[0][0]) / 2;
+      const yc = (last[1] + pts[0][1]) / 2;
+      c.quadraticCurveTo(last[0], last[1], xc, yc);
+      c.quadraticCurveTo(pts[0][0], pts[0][1], pts[0][0], pts[0][1]);
+      c.closePath();
+    } else {
+      c.lineTo(last[0], last[1]);
+    }
+    c.stroke();
+  }
+
+  function eye(c, x, y, r) {
+    c.beginPath(); c.arc(x, y, r, 0, Math.PI*2); c.stroke();
+    c.beginPath(); c.arc(x, y, Math.max(2, r*0.4), 0, Math.PI*2);
+    c.fillStyle = "#222"; c.fill();
+    c.fillStyle = "transparent";
+  }
+
+  const dinoArt = {
+    rex(c) {
+      // Körper
+      blob(c, [
+        [250,360],[230,300],[250,250],[300,210],[330,150],
+        [360,120],[410,130],[430,170],[400,200],[420,250],
+        [470,270],[560,260],[640,300],[690,360],[660,380],
+        [600,360],[560,380],[560,470],[540,540],[505,540],
+        [495,470],[470,420],[420,430],[420,520],[395,540],
+        [380,470],[370,410],[320,400],[290,420],[270,390]
+      ]);
+      // Bein-/Bauchlinien
+      c.beginPath(); c.moveTo(470,420); c.quadraticCurveTo(430,460,420,520); c.stroke();
+      // Ärmchen
+      c.beginPath(); c.moveTo(470,300); c.quadraticCurveTo(500,330,490,360); c.stroke();
+      c.beginPath(); c.moveTo(490,360); c.lineTo(478,360); c.moveTo(490,360); c.lineTo(490,372); c.stroke();
+      // Auge + Maul
+      eye(c, 390, 175, 11);
+      c.beginPath(); c.moveTo(360,210); c.lineTo(430,205); c.stroke();
+      // Zähne
+      for (let i=0;i<5;i++){ const x=370+i*14; c.beginPath(); c.moveTo(x,205); c.lineTo(x+6,216); c.lineTo(x+12,205); c.stroke(); }
+    },
+    stego(c) {
+      blob(c, [
+        [150,360],[170,320],[230,300],[300,300],[380,300],
+        [460,300],[540,310],[600,330],[660,360],[700,360],
+        [690,380],[650,380],[620,400],[615,470],[590,470],
+        [580,400],[540,400],[520,470],[495,470],[490,400],
+        [330,400],[330,470],[305,470],[300,400],[250,400],
+        [250,470],[225,470],[220,395],[180,390]
+      ]);
+      eye(c, 660, 350, 9);
+      c.beginPath(); c.moveTo(680,368); c.lineTo(700,372); c.stroke();
+      // Rückenplatten
+      const plates = [[260,300],[320,290],[380,285],[440,288],[500,295],[560,308]];
+      plates.forEach(p => {
+        c.beginPath(); c.moveTo(p[0]-26, p[1]);
+        c.quadraticCurveTo(p[0], p[1]-60, p[0]+26, p[1]); c.stroke();
+      });
+      // Schwanzspitzen (Thagomizer)
+      c.beginPath(); c.moveTo(150,360); c.lineTo(110,340); c.moveTo(150,360); c.lineTo(108,360);
+      c.moveTo(160,375); c.lineTo(118,385); c.stroke();
+    },
+    tri(c) {
+      blob(c, [
+        [180,420],[180,360],[230,330],[300,330],[360,340],
+        [380,300],[400,250],[470,240],[560,250],[640,270],
+        [690,300],[700,340],[680,360],[640,380],[600,420],
+        [590,500],[562,500],[555,430],[470,440],[470,500],
+        [443,500],[435,440],[330,440],[300,470],[270,470],
+        [262,440],[230,470],[205,470],[200,430]
+      ]);
+      // Nackenschild
+      c.beginPath(); c.moveTo(400,250); c.quadraticCurveTo(420,170,520,180);
+      c.quadraticCurveTo(620,190,640,270); c.stroke();
+      // Hörner
+      c.beginPath(); c.moveTo(660,300); c.lineTo(720,260); c.stroke();         // Nasenhorn
+      c.beginPath(); c.moveTo(600,250); c.lineTo(640,190); c.stroke();
+      c.beginPath(); c.moveTo(560,255); c.lineTo(585,195); c.stroke();
+      eye(c, 600, 300, 9);
+    },
+    bronto(c) {
+      blob(c, [
+        [150,440],[160,400],[210,380],[280,385],[330,395],
+        [340,330],[330,250],[340,180],[380,140],[440,135],
+        [470,165],[450,200],[420,250],[420,330],[450,360],
+        [560,360],[660,375],[700,410],[690,440],[650,450],
+        [610,450],[600,520],[575,520],[565,450],[490,450],
+        [485,520],[460,520],[450,450],[360,450],[355,520],
+        [330,520],[322,450],[250,448],[245,510],[222,510],
+        [215,448],[180,445]
+      ]);
+      eye(c, 425, 165, 9);
+      c.beginPath(); c.moveTo(395,150); c.lineTo(370,155); c.stroke(); // Maul
+      // Schwanz-Spitze
+      c.beginPath(); c.moveTo(150,440); c.quadraticCurveTo(100,440,80,420); c.stroke();
+    },
+    ptero(c) {
+      // Körper
+      blob(c, [
+        [380,300],[360,270],[370,240],[400,225],[450,235],
+        [470,265],[455,300],[470,340],[450,360],[420,355],
+        [405,330]
+      ]);
+      // Kopf + Schnabel + Kamm
+      c.beginPath(); c.moveTo(450,235); c.lineTo(560,210); c.stroke();   // Oberschnabel
+      c.beginPath(); c.moveTo(455,260); c.lineTo(545,245); c.stroke();   // Unterschnabel
+      c.beginPath(); c.moveTo(560,210); c.lineTo(545,245); c.stroke();   // Spitze
+      c.beginPath(); c.moveTo(420,225); c.lineTo(380,180); c.lineTo(440,215); c.stroke(); // Kamm
+      eye(c, 470, 245, 7);
+      // Flügel links
+      c.beginPath(); c.moveTo(390,275);
+      c.quadraticCurveTo(250,150,120,210);
+      c.quadraticCurveTo(230,250,250,300);
+      c.quadraticCurveTo(180,290,150,330);
+      c.quadraticCurveTo(300,330,390,300); c.stroke();
+      // Flügel rechts
+      c.beginPath(); c.moveTo(440,300);
+      c.quadraticCurveTo(560,200,690,250);
+      c.quadraticCurveTo(600,280,600,330);
+      c.quadraticCurveTo(660,330,690,370);
+      c.quadraticCurveTo(540,360,450,330); c.stroke();
+      // Beine
+      c.beginPath(); c.moveTo(420,355); c.lineTo(430,410); c.lineTo(415,425); c.stroke();
+      c.beginPath(); c.moveTo(450,355); c.lineTo(465,405); c.lineTo(480,418); c.stroke();
+    },
+    egg(c) {
+      // Ei
+      c.beginPath();
+      c.ellipse(440, 340, 150, 200, 0, 0, Math.PI*2);
+      c.stroke();
+      // Zickzack-Sprung
+      c.beginPath();
+      const zz = [[300,330],[340,300],[360,345],[400,310],[420,355],[470,320],[490,360],[540,325],[565,365],[600,335]];
+      c.moveTo(zz[0][0], zz[0][1]);
+      zz.forEach(p => c.lineTo(p[0], p[1]));
+      c.stroke();
+      // Punkte zum Ausmalen
+      const spots = [[400,210],[500,250],[360,420],[520,440],[440,500],[560,180]];
+      spots.forEach(s => { c.beginPath(); c.arc(s[0], s[1], 22, 0, Math.PI*2); c.stroke(); });
+    },
+    blank(c) { /* leeres Blatt */ }
+  };
+
+  document.querySelectorAll("button.dino").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const fn = dinoArt[btn.dataset.dino];
+      if (fn) newSheet(fn);
+      // praktisch: nach dem Laden direkt das Füll-Werkzeug anbieten
+      if (btn.dataset.dino !== "blank") setTool("fill");
+    });
+  });
+
+  // Tastatur-Komfort
+  window.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+      e.preventDefault();
+      if (undoStack.length) ctx.putImageData(undoStack.pop(), 0, 0);
+    }
+  });
+})();
+</script>
+</body>
+</html>
