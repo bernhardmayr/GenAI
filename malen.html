@@ -89,9 +89,7 @@
     box-shadow: 0 18px 40px rgba(0,0,0,0.45);
     padding: 0; overflow: hidden;
     width: 100%;
-    /* So breit wie möglich – aber gedeckelt, damit die (seitenverhältnis-
-       treue) Höhe ins Sichtfenster passt. Seitenverhältnis = 1100/780. */
-    max-width: min(1100px, calc((100vh - 90px) * 1.41));
+    max-width: min(1100px, 96vw);
     touch-action: none;
   }
   canvas { display: block; width: 100%; height: auto; cursor: crosshair; }
@@ -156,7 +154,7 @@
 
   <!-- Leinwand -->
   <div class="stage">
-    <canvas id="canvas" width="1100" height="780"></canvas>
+    <canvas id="canvas" width="1100" height="920"></canvas>
   </div>
 
   <!-- Ausmalbilder -->
