@@ -53,5 +53,13 @@ Geber → Farbe). Es gilt **kein Farbzwang**. Wer zuerst **3 Stiche** macht, gew
 Spiel (+2 Punkte); wer zuerst **11 Punkte** hat, gewinnt die Partie. Kartenstärke:
 Kritische → Rechter → Schläge → Trümpfe → Restkarten.
 
+### 🍄 Hüpfburg · Welt 1 (`platformer.html`)
+Ein **eigenständiges** Side-Scrolling-Jump-’n’-Run mit eigenen Figuren und eigenem
+Level (keine Kopie eines bestehenden Spiels). Laufe nach rechts, springe (variable
+Sprunghöhe), besiege „Grummler" per Stampfsprung, sammle Münzen, schlage Frage-Blöcke
+von unten an und erreiche die Ziel-Fahne. Mit Kamera-Scrolling, Röhren, Treppen,
+Lücken, Leben, Punkte- und Zeit-Anzeige.
+**Steuerung:** ← → / A D laufen, Leertaste/W/↑ springen (Touch-Steuerung auf dem Handy).
+
 ### Lokal spielen
 Repository klonen und `index.html` im Browser öffnen – fertig.
