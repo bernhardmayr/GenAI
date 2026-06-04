@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Bairisch Watten 🍺</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    min-height: 100vh;
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: radial-gradient(circle at 50% 30%, #1f6b45, #0c3b25 80%);
+    color: #f1f7f2;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 12px 10px 28px; gap: 10px;
+    -webkit-user-select: none; user-select: none;
+  }
+  a.back { align-self: flex-start; color: #bfeccf; text-decoration: none; font-size: 14px; opacity: 0.85; }
+  a.back:hover { opacity: 1; }
+  h1 { font-size: 24px; letter-spacing: 1px; }
+  .wrap { width: 100%; max-width: 640px; display: flex; flex-direction: column; gap: 10px; }
+  .score {
+    display: flex; justify-content: space-between; align-items: center;
+    background: rgba(0,0,0,0.25); border-radius: 10px; padding: 8px 14px; font-weight: 700;
+  }
+  .score .me { color: #ffd166; }
+  .score .opp { color: #8ecae6; }
+  .score .target { font-size: 12px; opacity: 0.65; font-weight: 600; }
+
+  .table {
+    background: rgba(0,0,0,0.18);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 14px; padding: 12px; min-height: 230px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .info { text-align: center; font-size: 14px; min-height: 22px; }
+  .info b { color: #ffd166; }
+  .pile { display: flex; justify-content: center; align-items: center; gap: 8px; min-height: 14px; }
+  .pile .lbl { font-size: 11px; opacity: 0.6; }
+  .trickArea { display: flex; justify-content: center; gap: 22px; align-items: center; min-height: 96px; }
+  .trickSlot { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .trickSlot .who { font-size: 11px; opacity: 0.7; }
+
+  .hand { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; min-height: 92px; }
+  .hand.top { opacity: 0.95; }
+
+  .card {
+    width: 58px; height: 84px; border-radius: 8px; background: #fbfbf5;
+    color: #1a1a2e; position: relative; box-shadow: 0 3px 6px rgba(0,0,0,0.35);
+    display: flex; align-items: center; justify-content: center; font-weight: 800;
+    border: 1px solid #d8d8c8; transition: transform 0.1s ease, box-shadow 0.1s ease;
+  }
+  .card .rank { position: absolute; top: 4px; left: 6px; font-size: 16px; }
+  .card .rankb { position: absolute; bottom: 4px; right: 6px; font-size: 16px; transform: rotate(180deg); }
+  .card .suit { font-size: 30px; }
+  .card.small { width: 50px; height: 74px; }
+  .card.back {
+    background: repeating-linear-gradient(45deg, #2a5d8f, #2a5d8f 6px, #244e78 6px, #244e78 12px);
+    border: 1px solid #1b3a5a;
+  }
+  .card.playable { cursor: pointer; }
+  .card.playable:hover { transform: translateY(-8px); box-shadow: 0 10px 18px rgba(0,0,0,0.45); }
+  .card.dim { opacity: 0.5; }
+  .badge {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%) rotate(-12deg);
+    font-size: 10px; font-weight: 800; padding: 2px 5px; border-radius: 5px;
+    background: #1a1a2e; color: #ffd166; letter-spacing: 0.5px; white-space: nowrap;
+  }
+  .badge.trumpf { background: #245a8c; color: #cfe8ff; }
+  .badge.schlag { background: #5a3b1d; color: #ffe0a8; }
+  .badge.krit { background: #7a1f3a; color: #ffd6e2; }
+
+  .panel { display: flex; flex-direction: column; gap: 8px; align-items: center; }
+  .panel .q { font-size: 14px; opacity: 0.9; }
+  .choices { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  button {
+    font: inherit; font-weight: 700; font-size: 14px; color: #0c3b25;
+    background: linear-gradient(90deg, #ffd166, #ffe29a); border: none;
+    border-radius: 999px; padding: 9px 16px; cursor: pointer; transition: transform 0.1s ease;
+  }
+  button:hover { transform: translateY(-2px); }
+  button.suit { display: flex; align-items: center; gap: 6px; }
+
+  .msg { text-align: center; font-size: 14px; min-height: 20px; opacity: 0.95; }
+  .msg.big { font-size: 18px; font-weight: 700; color: #ffd166; }
+
+  #overlay {
+    position: fixed; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center; gap: 16px;
+    background: rgba(6,28,18,0.9); padding: 24px; z-index: 20;
+  }
+  #overlay.hidden { display: none; }
+  #overlay h2 {
+    font-size: clamp(28px, 7vw, 46px);
+    background: linear-gradient(90deg, #ffd166, #8ecae6);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  #overlay p { max-width: 440px; line-height: 1.55; font-size: 14px; opacity: 0.9; }
+  .legend { font-size: 12px; opacity: 0.7; max-width: 520px; text-align: center; line-height: 1.5; }
+  .legend b { color: #ffd166; }
+</style>
+</head>
+<body>
+  <a class="back" href="index.html">← Zurück zur Spieleauswahl</a>
+  <h1>🍺 Bairisch Watten</h1>
+
+  <div class="wrap">
+    <div class="score">
+      <span class="opp">Computer: <span id="scoreOpp">0</span></span>
+      <span class="target">Spiel bis 11 · erster mit 3 Stichen gewinnt</span>
+      <span class="me">Du: <span id="scoreMe">0</span></span>
+    </div>
+
+    <div class="hand top" id="oppHand"></div>
+
+    <div class="table">
+      <div class="info" id="info">—</div>
+      <div class="trickArea" id="trickArea"></div>
+      <div class="panel" id="panel"></div>
+    </div>
+
+    <div class="hand" id="myHand"></div>
+    <div class="msg" id="msg"></div>
+  </div>
+
+  <p class="legend">
+    <b>Die 3 Kritischen</b> (immer am höchsten): Max = Herz-König ♥K · Belli = Schellen-7 🔔7 · Spitz = Eichel-7 🌰7.
+    Danach: <b>Rechter</b> (Schlag in der Trumpffarbe) → übrige <b>Schläge</b> → <b>Trümpfe</b> → Restkarten.
+    Es gibt <b>keinen Farbzwang</b> – du darfst jede Karte spielen.
+  </p>
+
+  <div id="overlay">
+    <h2>Bairisch Watten</h2>
+    <p>Stich-Kartenspiel zu zweit. Es werden <b>Schlag</b> (ein Rang) und <b>Farbe</b> (Trumpf)
+       angesagt – der Vorhand sagt den Schlag, der Geber die Farbe. Wer zuerst <b>3 Stiche</b>
+       macht, gewinnt das Spiel (+2 Punkte). Wer zuerst <b>11 Punkte</b> hat, gewinnt die Partie.</p>
+    <button id="startBtn">Anfangen</button>
+  </div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- Cards ----------
+  const SUITS = [
+    { id: "Eichel",   sym: "🌰", color: "#9c6b2e" },
+    { id: "Gras",     sym: "🌿", color: "#2f8a3e" },
+    { id: "Herz",     sym: "♥",  color: "#d62839" },
+    { id: "Schellen", sym: "🔔", color: "#cf8a14" }
+  ];
+  const RANKS = [
+    { id: "Sau",    label: "A",  val: 7 },
+    { id: "Koenig", label: "K",  val: 6, de: "König" },
+    { id: "Ober",   label: "O",  val: 5 },
+    { id: "Unter",  label: "U",  val: 4 },
+    { id: "Zehn",   label: "10", val: 3 },
+    { id: "Neun",   label: "9",  val: 2 },
+    { id: "Acht",   label: "8",  val: 1 },
+    { id: "Sieben", label: "7",  val: 0 }
+  ];
+  const suitOf = id => SUITS.find(s => s.id === id);
+  const rankOf = id => RANKS.find(r => r.id === id);
+  const rankName = id => rankOf(id).de || (rankOf(id).label === "A" ? "Sau" : rankOf(id).label);
+  const blindOrder = { Herz: 3, Gras: 2, Eichel: 1, Schellen: 0 };
+
+  const isMax   = c => c.suit === "Herz" && c.rank === "Koenig";
+  const isBelli = c => c.suit === "Schellen" && c.rank === "Sieben";
+  const isSpitz = c => c.suit === "Eichel" && c.rank === "Sieben";
+
+  // strength for winning a trick (higher = stronger); led = suit led this trick
+  function strength(c, R, F, led) {
+    if (isMax(c)) return 3002;
+    if (isBelli(c)) return 3001;
+    if (isSpitz(c)) return 3000;
+    if (c.rank === R && c.suit === F) return 2000;        // Rechter
+    if (c.rank === R) return 1000 + blindOrder[c.suit];   // blinder Schlag
+    if (c.suit === F) return 500 + rankOf(c.rank).val;     // Trumpf
+    if (c.suit === led) return rankOf(c.rank).val;         // Restkarte der Ausspielfarbe
+    return -1;                                              // kann nicht stechen
+  }
+  // value for "how good a card is to keep" (independent of led suit)
+  function keepValue(c, R, F) {
+    if (isMax(c)) return 312;
+    if (isBelli(c)) return 311;
+    if (isSpitz(c)) return 310;
+    if (c.rank === R && c.suit === F) return 200;
+    if (c.rank === R) return 100 + blindOrder[c.suit];
+    if (c.suit === F) return 50 + rankOf(c.rank).val;
+    return rankOf(c.rank).val;
+  }
+  function cardTag(c) {
+    if (isMax(c)) return ["MAX", "krit"];
+    if (isBelli(c)) return ["BELLI", "krit"];
+    if (isSpitz(c)) return ["SPITZ", "krit"];
+    if (!R || !F) return null;
+    if (c.rank === R && c.suit === F) return ["RECHTER", "schlag"];
+    if (c.rank === R) return ["SCHLAG", "schlag"];
+    if (c.suit === F) return ["TRUMPF", "trumpf"];
+    return null;
+  }
+
+  function newDeck() {
+    const d = [];
+    for (const s of SUITS) for (const r of RANKS) d.push({ suit: s.id, rank: r.id });
+    for (let i = d.length - 1; i > 0; i--) {
+      const j = (Math.random() * (i + 1)) | 0;
+      [d[i], d[j]] = [d[j], d[i]];
+    }
+    return d;
+  }
+
+  // ---------- State ----------
+  const TARGET = 11, SPIEL_POINTS = 2;
+  let hands = [[], []];        // 0 = you, 1 = computer
+  let scores = [0, 0];
+  let tricksWon = [0, 0];
+  let dealer = 0;              // who dealt
+  let forehand = 1;           // 1 - dealer
+  let R = null, F = null;     // Schlag rank, trump suit
+  let trick = [];             // {player, card}
+  let turn = -1;
+  let leader = 1;
+  let phase = "idle";
+  let lastWinner = -1;
+
+  // ---------- DOM ----------
+  const el = id => document.getElementById(id);
+  const oppHandEl = el("oppHand"), myHandEl = el("myHand");
+  const trickAreaEl = el("trickArea"), infoEl = el("info"), panelEl = el("panel"), msgEl = el("msg");
+  const overlay = el("overlay");
+
+  function cardEl(c, opts = {}) {
+    const d = document.createElement("div");
+    d.className = "card" + (opts.small ? " small" : "");
+    if (opts.back) { d.classList.add("back"); return d; }
+    const s = suitOf(c.suit);
+    d.innerHTML =
+      '<span class="rank" style="color:' + s.color + '">' + rankOf(c.rank).label + '</span>' +
+      '<span class="suit" style="color:' + s.color + '">' + s.sym + '</span>' +
+      '<span class="rankb" style="color:' + s.color + '">' + rankOf(c.rank).label + '</span>';
+    const tag = cardTag(c);
+    if (tag) {
+      const b = document.createElement("div");
+      b.className = "badge " + tag[1];
+      b.textContent = tag[0];
+      d.appendChild(b);
+    }
+    return d;
+  }
+
+  function render() {
+    // opponent hand (face down)
+    oppHandEl.innerHTML = "";
+    for (let i = 0; i < hands[1].length; i++) oppHandEl.appendChild(cardEl(null, { back: true, small: true }));
+
+    // info line
+    if (R && F) {
+      infoEl.innerHTML = "Schlag: <b>" + rankName(R) + "</b> · Trumpf: <b>" +
+        F + " " + suitOf(F).sym + "</b> &nbsp;|&nbsp; Stiche – Du " +
+        tricksWon[0] + " : " + tricksWon[1] + " Computer";
+    } else {
+      infoEl.textContent = "Neues Spiel … Karten werden angesagt.";
+    }
+
+    // trick area
+    trickAreaEl.innerHTML = "";
+    const slots = [{ player: 1, label: "Computer" }, { player: 0, label: "Du" }];
+    for (const sl of slots) {
+      const wrap = document.createElement("div");
+      wrap.className = "trickSlot";
+      const played = trick.find(t => t.player === sl.player);
+      if (played) wrap.appendChild(cardEl(played.card, { small: true }));
+      else { const ph = document.createElement("div"); ph.style.width = "50px"; ph.style.height = "74px"; wrap.appendChild(ph); }
+      const w = document.createElement("div"); w.className = "who"; w.textContent = sl.label;
+      wrap.appendChild(w);
+      trickAreaEl.appendChild(wrap);
+    }
+
+    // my hand
+    myHandEl.innerHTML = "";
+    const canPlay = phase === "play" && turn === 0;
+    for (const c of hands[0]) {
+      const d = cardEl(c);
+      if (canPlay) { d.classList.add("playable"); d.addEventListener("click", () => humanPlay(c)); }
+      myHandEl.appendChild(d);
+    }
+  }
+
+  function setMsg(t, big) { msgEl.textContent = t; msgEl.className = "msg" + (big ? " big" : ""); }
+  function clearPanel() { panelEl.innerHTML = ""; }
+
+  // ---------- Flow ----------
+  function startMatch() {
+    scores = [0, 0];
+    dealer = Math.random() < 0.5 ? 0 : 1;
+    overlay.classList.add("hidden");
+    updateScores();
+    startSpiel();
+  }
+
+  function startSpiel() {
+    const deck = newDeck();
+    hands[0] = deck.slice(0, 5);
+    hands[1] = deck.slice(5, 10);
+    hands[0].sort((a, b) => keepValue(b, R, F) - keepValue(a, R, F));
+    tricksWon = [0, 0];
+    trick = [];
+    R = null; F = null;
+    forehand = 1 - dealer;
+    leader = forehand;
+    phase = "schlag";
+    clearPanel();
+    render();
+    setMsg(forehand === 0 ? "Du bist Vorhand – sag den Schlag an." : "Computer ist Vorhand und sagt den Schlag an.");
+    doSchlag();
+  }
+
+  function doSchlag() {
+    if (forehand === 1) {
+      R = aiChooseSchlag(hands[1]);
+      setMsg("Computer wählt Schlag: " + rankName(R) + ".");
+      render();
+      setTimeout(doFarbe, 1000);
+    } else {
+      // human picks schlag
+      clearPanel();
+      const q = document.createElement("div"); q.className = "q"; q.textContent = "Welchen Schlag (Rang) sagst du an?";
+      const ch = document.createElement("div"); ch.className = "choices";
+      for (const r of RANKS) {
+        const b = document.createElement("button");
+        b.textContent = rankName(r.id);
+        b.onclick = () => { R = r.id; clearPanel(); render(); doFarbe(); };
+        ch.appendChild(b);
+      }
+      panelEl.append(q, ch);
+    }
+  }
+
+  function doFarbe() {
+    phase = "farbe";
+    if (dealer === 1) {
+      F = aiChooseFarbe(hands[1], R);
+      setMsg("Computer wählt Trumpf: " + F + " " + suitOf(F).sym + ".");
+      hands[0].sort((a, b) => keepValue(b, R, F) - keepValue(a, R, F));
+      render();
+      setTimeout(beginPlay, 1100);
+    } else {
+      clearPanel();
+      const q = document.createElement("div"); q.className = "q"; q.textContent = "Welche Farbe wird Trumpf?";
+      const ch = document.createElement("div"); ch.className = "choices";
+      for (const s of SUITS) {
+        const b = document.createElement("button");
+        b.className = "suit";
+        b.innerHTML = '<span style="color:' + s.color + '">' + s.sym + "</span> " + s.id;
+        b.onclick = () => {
+          F = s.id; clearPanel();
+          hands[0].sort((a, b2) => keepValue(b2, R, F) - keepValue(a, R, F));
+          render(); beginPlay();
+        };
+        ch.appendChild(b);
+      }
+      panelEl.append(q, ch);
+    }
+  }
+
+  function beginPlay() {
+    phase = "play";
+    leader = forehand;
+    turn = forehand;
+    render();
+    setMsg(turn === 0 ? "Du spielst aus." : "Computer spielt aus …");
+    if (turn === 1) setTimeout(aiPlay, 800);
+  }
+
+  function humanPlay(c) {
+    if (phase !== "play" || turn !== 0) return;
+    doPlay(0, c);
+  }
+
+  function aiPlay() {
+    if (phase !== "play" || turn !== 1) return;
+    const c = aiChoose(hands[1]);
+    doPlay(1, c);
+  }
+
+  function doPlay(p, c) {
+    hands[p] = hands[p].filter(x => !(x.suit === c.suit && x.rank === c.rank));
+    trick.push({ player: p, card: c });
+    render();
+    if (trick.length === 2) {
+      turn = -1;
+      setTimeout(resolveTrick, 950);
+    } else {
+      turn = 1 - p;
+      render();
+      if (turn === 0) setMsg("Du bist dran.");
+      else { setMsg("Computer überlegt …"); setTimeout(aiPlay, 800); }
+    }
+  }
+
+  function resolveTrick() {
+    const led = trick[0].card.suit;
+    let best = trick[0], bestS = strength(trick[0].card, R, F, led);
+    for (let i = 1; i < trick.length; i++) {
+      const s = strength(trick[i].card, R, F, led);
+      if (s > bestS) { bestS = s; best = trick[i]; }
+    }
+    const w = best.player;
+    tricksWon[w]++;
+    lastWinner = w;
+    render();
+    setMsg((w === 0 ? "Du machst" : "Computer macht") + " den Stich!");
+    setTimeout(() => {
+      trick = [];
+      if (tricksWon[w] >= 3) { endSpiel(w); return; }
+      leader = w; turn = w;
+      render();
+      if (turn === 0) setMsg("Du spielst aus.");
+      else { setMsg("Computer spielt aus …"); setTimeout(aiPlay, 800); }
+    }, 1200);
+  }
+
+  function endSpiel(w) {
+    phase = "spielEnd";
+    scores[w] += SPIEL_POINTS;
+    updateScores();
+    render();
+    if (scores[w] >= TARGET) { endMatch(w); return; }
+    setMsg((w === 0 ? "Du gewinnst" : "Computer gewinnt") + " das Spiel (+" + SPIEL_POINTS + ").", true);
+    clearPanel();
+    const b = document.createElement("button");
+    b.textContent = "Nächstes Spiel ▶";
+    b.onclick = () => { dealer = 1 - dealer; startSpiel(); };
+    panelEl.appendChild(b);
+  }
+
+  function endMatch(w) {
+    phase = "matchEnd";
+    overlay.innerHTML =
+      "<h2>" + (w === 0 ? "🏆 Gewonnen!" : "Verloren …") + "</h2>" +
+      "<p>Endstand – Du <b>" + scores[0] + "</b> : <b>" + scores[1] + "</b> Computer.<br>" +
+      (w === 0 ? "Sauber gewattet! 🍺" : "Nächstes Mal klappt's, gell.") + "</p>" +
+      '<button id="againBtn">Neue Partie</button>';
+    overlay.classList.remove("hidden");
+    el("againBtn").onclick = startMatch;
+  }
+
+  function updateScores() {
+    el("scoreMe").textContent = scores[0];
+    el("scoreOpp").textContent = scores[1];
+  }
+
+  // ---------- AI ----------
+  function aiChooseSchlag(hand) {
+    // pick the rank the AI holds most of; tie -> higher card value
+    const count = {}, bestVal = {};
+    for (const c of hand) {
+      count[c.rank] = (count[c.rank] || 0) + 1;
+      bestVal[c.rank] = Math.max(bestVal[c.rank] || 0, rankOf(c.rank).val);
+    }
+    let best = hand[0].rank;
+    for (const r in count) {
+      if (count[r] > count[best] ||
+         (count[r] === count[best] && bestVal[r] > bestVal[best])) best = r;
+    }
+    return best;
+  }
+  function aiChooseFarbe(hand, r) {
+    // pick suit with most cards (more trumps); tie -> the one giving a Rechter
+    const count = {};
+    for (const c of hand) count[c.suit] = (count[c.suit] || 0) + 1;
+    let best = hand[0].suit;
+    for (const s in count) {
+      const better = count[s] > count[best];
+      const tie = count[s] === count[best];
+      const hasRechter = hand.some(c => c.suit === s && c.rank === r);
+      const bestHasRechter = hand.some(c => c.suit === best && c.rank === r);
+      if (better || (tie && hasRechter && !bestHasRechter)) best = s;
+    }
+    return best;
+  }
+  function aiChoose(hand) {
+    const aiT = tricksWon[1], oppT = tricksWon[0];
+    if (trick.length === 0) {
+      // leading: if close to winning, play strongest; else conserve (play weakest)
+      const sorted = hand.slice().sort((a, b) => keepValue(a, R, F) - keepValue(b, R, F));
+      return aiT === 2 ? sorted[sorted.length - 1] : sorted[0];
+    }
+    const opp = trick[0].card;
+    const led = opp.suit;
+    const oppS = strength(opp, R, F, led);
+    const beating = hand.filter(c => strength(c, R, F, led) > oppS);
+    const weakest = hand.slice().sort((a, b) => keepValue(a, R, F) - keepValue(b, R, F))[0];
+    const decisive = aiT === 2 || oppT === 2;
+    if (beating.length) {
+      const cheapest = beating.slice().sort((a, b) => keepValue(a, R, F) - keepValue(b, R, F))[0];
+      if (decisive) return cheapest;
+      // don't waste a high card on a meaningless trick
+      if (keepValue(cheapest, R, F) >= 100 && hand.length > 1) return weakest;
+      return cheapest;
+    }
+    return weakest;
+  }
+
+  // ---------- Boot ----------
+  el("startBtn").onclick = startMatch;
+  render();
+})();
+</script>
+</body>
+</html>

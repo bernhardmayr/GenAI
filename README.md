@@ -44,5 +44,14 @@ sammle 💎, finde den **Schlüssel 🗝️**, öffne die verschlossene Tür und
 **Steuerung:** Bewegen mit **WASD**/Pfeiltasten, Schwert mit **Leertaste** oder **J**
 (Touch-Steuerung auf dem Handy). Mit Herzen, Unverwundbarkeits-Frames und Rückstoß.
 
+### 🍺 Bairisch Watten (`watten.html`)
+Das traditionelle bayerische Karten-Stichspiel, **zu zweit gegen den Computer**.
+Mit bayerischem Blatt (Eichel, Gras, Herz, Schellen) und den drei unschlagbaren
+**Kritischen**: Max (Herz-König), Belli (Schellen-7), Spitz (Eichel-7).
+Pro Spiel werden **Schlag** (Rang) und **Farbe** (Trumpf) angesagt (Vorhand → Schlag,
+Geber → Farbe). Es gilt **kein Farbzwang**. Wer zuerst **3 Stiche** macht, gewinnt das
+Spiel (+2 Punkte); wer zuerst **11 Punkte** hat, gewinnt die Partie. Kartenstärke:
+Kritische → Rechter → Schläge → Trümpfe → Restkarten.
+
 ### Lokal spielen
 Repository klonen und `index.html` im Browser öffnen – fertig.
