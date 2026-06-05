@@ -82,24 +82,28 @@
 
   .sizeVal { font-size: 13px; opacity: 0.7; width: 38px; text-align: left; }
 
-  /* Canvas */
+  /* Canvas: Höhe über die "padding-bottom"-Technik erzwingen.
+     Der .stage bekommt seine Höhe von einem Pseudo-Element (Verhältnis
+     920/1100 = 83.64%), das Canvas füllt ihn absolut. Das ist unabhängig
+     von der (auf iOS unzuverlässigen) Höhenberechnung eines <canvas>. */
   .stage {
+    position: relative;
     background: #fff;
     border-radius: 16px;
     box-shadow: 0 18px 40px rgba(0,0,0,0.45);
-    padding: 0; overflow: hidden;
-    width: fit-content;
-    max-width: 100%;
+    overflow: hidden;
+    width: 100%;
+    max-width: 1100px;
+    aspect-ratio: 1100 / 920;
+    flex: none;
     touch-action: none;
   }
-  /* aspect-ratio explizit setzen: iOS-Safari berechnet die Höhe bei
-     width:100%/height:auto für <canvas> sonst nicht und lässt es zu
-     einem dünnen Streifen zusammenfallen. */
   canvas {
-    display: block;
+    position: absolute;
+    top: 0; left: 0;
     width: 100%;
-    height: auto;
-    aspect-ratio: 1100 / 920;
+    height: 100%;
+    display: block;
     cursor: crosshair;
   }
 
@@ -191,31 +195,21 @@
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   const W = canvas.width, H = canvas.height;
 
-  // ---------- Anzeigehöhe hart setzen ----------
-  // Manche Browser (v. a. iOS-Safari) berechnen die Höhe eines <canvas>
-  // mit width:100%/height:auto nicht und lassen es zu einem dünnen Streifen
-  // zusammenfallen. Deshalb setzen wir Breite UND Höhe der Anzeige selbst,
-  // hart in px, abgeleitet aus der Fensterbreite (immer ein sinnvoller Wert,
-  // nie 0). Der Zeichenpuffer bleibt konstant W×H; pos() rechnet per Rect um.
-  function fitCanvas() {
-    const vw = document.documentElement.clientWidth || window.innerWidth || 360;
-    const cssW = Math.max(240, Math.min(1100, vw - 24));
-    const cssH = Math.round(cssW * H / W);
-    canvas.style.width = cssW + "px";
-    canvas.style.height = cssH + "px";
+  // ---------- Diagnose ----------
+  // Die Größe regelt jetzt CSS (padding-bottom-Technik). Wir zeigen nur die
+  // gemessene Leinwandgröße zur Kontrolle an.
+  function updateDiag() {
     const d = document.getElementById("diag");
-    if (d) d.textContent = " · v11 · Leinwand " + Math.round(cssW) + "×" + cssH +
-      " px · gemessen " + Math.round(canvas.getBoundingClientRect().width) +
-      "×" + Math.round(canvas.getBoundingClientRect().height);
+    if (!d) return;
+    const r = canvas.getBoundingClientRect();
+    d.textContent = " · v12 · Leinwand gemessen " +
+      Math.round(r.width) + "×" + Math.round(r.height) + " px";
   }
-  window.addEventListener("resize", fitCanvas);
-  window.addEventListener("orientationchange", fitCanvas);
-  window.addEventListener("load", fitCanvas);
-  // mehrfach, falls Layout/Schriften beim ersten Lauf noch nicht final sind
-  fitCanvas();
-  requestAnimationFrame(fitCanvas);
-  setTimeout(fitCanvas, 100);
-  setTimeout(fitCanvas, 500);
+  window.addEventListener("resize", updateDiag);
+  window.addEventListener("orientationchange", updateDiag);
+  window.addEventListener("load", updateDiag);
+  updateDiag();
+  setTimeout(updateDiag, 200);
 
   // ---------- Zustand ----------
   const state = {
