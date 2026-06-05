@@ -69,5 +69,30 @@ Radiergummi und ein **Füll-Werkzeug** (🪣 Flood-Fill) zum flächigen Ausmalen
 **Funktionen:** Rückgängig (auch Strg/⌘+Z), Leinwand leeren und Bild als PNG speichern.
 Maus- und Touch-Bedienung.
 
+### 👗 Anzieh-Atelier (`anziehen.html`)
+Erschaffe eine eigene Figur (Hautfarbe, Frisur, Haarfarbe, Augen, Mund), ziehe sie aus
+einem Kleiderschrank an (Oberteil, Hose, Rock, Kleid, Schuhe, Hut) und **näh dir eigene
+Kleider** in der Schneiderei – mit Grundfarbe, Muster (Streifen, Punkte, Herzen, Sterne,
+Karos) und Musterfarbe. Selbst genähte Stücke landen im Schrank und bleiben gespeichert.
+**Funktionen:** Zufalls-Outfit, Bild als PNG speichern, alles als SVG, Touch-Bedienung.
+
+### 🐾 Vivis Tierpraxis (`tierpraxis.html`)
+Werde kleine Tierärztin: Ein Tier kommt als Patient und zeigt 2–4 Probleme. Wähle das
+**richtige Werkzeug** und tippe aufs Tier, bis es wieder gesund und glücklich ist – kein
+Verlieren, nur Helfen.
+
+| Werkzeug | hilft bei |
+|----------|-----------|
+| 🩹 Pflaster | Wunde |
+| 💉 Spritze | krank |
+| 🌡️ Thermometer | Fieber |
+| 🧽 Schwamm | schmutzig |
+| 🍖 Futter | hungrig |
+| ❤️ Streicheln | traurig |
+
+Acht Tiere (Hund, Katze, Kaninchen, Vogel, Hamster, Schildkröte, Fuchs, Schwein),
+**Sticker-Album** für geheilte Tiere, Jubel-Animation mit Tönen (stummschaltbar) und
+Bild als PNG speichern. Alles als SVG, Touch-Bedienung, lokal gespeichert.
+
 ### Lokal spielen
 Repository klonen und `index.html` im Browser öffnen – fertig.
