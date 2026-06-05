@@ -80,22 +80,31 @@
   }
   input[type="range"] { width: 130px; accent-color: #06d6a0; cursor: pointer; }
 
-  .sizeVal { font-size: 13px; opacity: 0.7; width: 38px; text-align: left; }
+  .sizeVal { font-size: 13px; opacity: 0.7; width: 56px; text-align: left; }
 
-  /* Canvas: Höhe über die "padding-bottom"-Technik erzwingen.
-     Der .stage bekommt seine Höhe von einem Pseudo-Element (Verhältnis
-     920/1100 = 83.64%), das Canvas füllt ihn absolut. Das ist unabhängig
-     von der (auf iOS unzuverlässigen) Höhenberechnung eines <canvas>. */
+  /* Scrollbarer Leinwand-Bereich: die Leinwand darf größer als der
+     Bildschirm sein – dann kann man scrollen bzw. mit ✋ verschieben. */
+  .canvasScroll {
+    width: 100%;
+    max-width: 1100px;
+    max-height: 78vh;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 16px;
+    background: rgba(0,0,0,0.22);
+    border: 1px solid rgba(255,255,255,0.08);
+    padding: 14px;
+  }
   .stage {
     position: relative;
     background: #fff;
-    border-radius: 16px;
-    box-shadow: 0 18px 40px rgba(0,0,0,0.45);
+    border-radius: 12px;
+    box-shadow: 0 14px 34px rgba(0,0,0,0.45);
     overflow: hidden;
-    width: 100%;
-    max-width: 1100px;
-    aspect-ratio: 1100 / 920;
-    flex: none;
+    /* Block-Zentrierung: bei Übergröße bleiben die Ränder erreichbar
+       (anders als bei flex/justify-content:center). */
+    margin: 0 auto;
+    /* Breite/Höhe werden per JS in px gesetzt (Format × Zoom) */
     touch-action: none;
   }
   canvas {
@@ -104,7 +113,7 @@
     width: 100%;
     height: 100%;
     display: block;
-    cursor: crosshair;
+    touch-action: none;
   }
 
   .dinos { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
@@ -147,6 +156,7 @@
         <button class="tool" data-tool="fill" title="Flächen füllen">🪣 Füllen</button>
         <button class="tool" data-tool="rainbow" title="Regenbogen-Pinsel">🌈 Regenbogen</button>
         <button class="tool" data-tool="eraser" title="Radiergummi">🧽 Radierer</button>
+        <button class="tool" data-tool="pan" title="Leinwand verschieben (scrollen)">✋ Verschieben</button>
       </div>
     </div>
 
@@ -165,9 +175,33 @@
     </div>
   </div>
 
-  <!-- Leinwand -->
-  <div class="stage">
-    <canvas id="canvas" width="1100" height="920"></canvas>
+  <!-- Leinwand-Einstellungen -->
+  <div class="panel">
+    <div class="row">
+      <div class="group">
+        <span class="label">Format</span>
+        <button class="tool" data-format="1100x900" title="Querformat">🖼️ Quer</button>
+        <button class="tool" data-format="900x1200" title="Hochformat">📄 Hoch</button>
+        <button class="tool" data-format="1000x1000" title="Quadrat">⬛ Quadrat</button>
+        <button class="tool" data-format="2000x1400" title="Riesige Leinwand">➕ Riesig</button>
+      </div>
+      <div class="sep"></div>
+      <div class="group">
+        <span class="label">Zoom</span>
+        <button class="tool" id="zoomOut" title="Verkleinern">➖</button>
+        <input type="range" id="zoom" min="10" max="400" step="5" value="100">
+        <button class="tool" id="zoomIn" title="Vergrößern">➕</button>
+        <span class="sizeVal" id="zoomVal">100 %</span>
+        <button class="tool" id="zoomFit" title="An Bildschirm anpassen">🔳 Einpassen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Leinwand (scrollbar, darf größer als der Bildschirm sein) -->
+  <div class="canvasScroll" id="canvasScroll">
+    <div class="stage" id="stage">
+      <canvas id="canvas" width="1100" height="900"></canvas>
+    </div>
   </div>
 
   <!-- Ausmalbilder -->
@@ -186,30 +220,71 @@
     </div>
   </div>
 
-  <footer>Tipp: Mit dem 🪣 <b>Füllen</b>-Werkzeug malst du ganze Flächen eines Ausmalbilds mit einem Klick aus. Funktioniert mit Maus und Finger.<span id="diag" style="display:block;opacity:0.7;margin-top:4px;"></span></footer>
+  <footer>Tipp: Stelle <b>Format</b> und <b>Zoom</b> der Leinwand ein – sie darf auch größer als der Bildschirm sein. Mit ✋ <b>Verschieben</b> bewegst du dich über eine große Leinwand. 🪣 <b>Füllen</b> koloriert ganze Flächen mit einem Klick.</footer>
 
 <script>
 "use strict";
 (function () {
   const canvas = document.getElementById("canvas");
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
-  const W = canvas.width, H = canvas.height;
+  const stage = document.getElementById("stage");
+  const scroll = document.getElementById("canvasScroll");
+  // W/H = Auflösung des Zeichenpuffers (kann per Format geändert werden).
+  let W = canvas.width, H = canvas.height;
 
-  // ---------- Diagnose ----------
-  // Die Größe regelt jetzt CSS (padding-bottom-Technik). Wir zeigen nur die
-  // gemessene Leinwandgröße zur Kontrolle an.
-  function updateDiag() {
-    const d = document.getElementById("diag");
-    if (!d) return;
-    const r = canvas.getBoundingClientRect();
-    d.textContent = " · v12 · Leinwand gemessen " +
-      Math.round(r.width) + "×" + Math.round(r.height) + " px";
+  // ---------- Leinwandgröße & Zoom ----------
+  // zoom in % der Anzeige: 100 % = 1 Canvas-Pixel : 1 CSS-Pixel. Wird die
+  // Anzeige größer als der sichtbare Bereich, kann man scrollen/verschieben.
+  let zoom = 100;
+
+  function applyDisplay() {
+    stage.style.width  = Math.round(W * zoom / 100) + "px";
+    stage.style.height = Math.round(H * zoom / 100) + "px";
   }
-  window.addEventListener("resize", updateDiag);
-  window.addEventListener("orientationchange", updateDiag);
-  window.addEventListener("load", updateDiag);
-  updateDiag();
-  setTimeout(updateDiag, 200);
+
+  function setZoom(z, fromSlider) {
+    zoom = Math.max(10, Math.min(400, Math.round(z)));
+    const slider = document.getElementById("zoom");
+    const val = document.getElementById("zoomVal");
+    if (slider && !fromSlider) slider.value = zoom;
+    if (val) val.textContent = zoom + " %";
+    applyDisplay();
+  }
+
+  function fitZoom() {
+    // Zoom so wählen, dass die Leinwand in die Breite des Bereichs passt.
+    const avail = (scroll.clientWidth || 320) - 30;
+    setZoom(Math.max(10, Math.floor(avail / W * 100)));
+  }
+
+  function setFormat(w, h) {
+    // bestehende Zeichnung erhalten (oben links ausgerichtet)
+    const tmp = document.createElement("canvas");
+    tmp.width = W; tmp.height = H;
+    tmp.getContext("2d").drawImage(canvas, 0, 0);
+    W = w; H = h;
+    canvas.width = w; canvas.height = h;
+    fillWhite();
+    ctx.drawImage(tmp, 0, 0);
+    undoStack.length = 0;
+    fitZoom();
+  }
+
+  // Bedienelemente verdrahten
+  document.querySelectorAll("button[data-format]").forEach(b => {
+    b.addEventListener("click", () => {
+      const parts = b.dataset.format.split("x");
+      setFormat(parseInt(parts[0], 10), parseInt(parts[1], 10));
+    });
+  });
+  document.getElementById("zoom").addEventListener("input", (e) => setZoom(parseInt(e.target.value, 10), true));
+  document.getElementById("zoomIn").addEventListener("click", () => setZoom(zoom + 20));
+  document.getElementById("zoomOut").addEventListener("click", () => setZoom(zoom - 20));
+  document.getElementById("zoomFit").addEventListener("click", fitZoom);
+  window.addEventListener("orientationchange", fitZoom);
+  window.addEventListener("load", fitZoom);
+  applyDisplay();
+  fitZoom();
 
   // ---------- Zustand ----------
   const state = {
@@ -222,7 +297,7 @@
   };
 
   const undoStack = [];
-  const MAX_UNDO = 25;
+  const MAX_UNDO = 12;
 
   function pushUndo() {
     try {
@@ -279,7 +354,9 @@
   function setTool(name) {
     state.tool = name;
     toolBtns.forEach(b => b.classList.toggle("active", b.dataset.tool === name));
-    canvas.style.cursor = (name === "fill") ? "cell" : "crosshair";
+    canvas.style.cursor =
+      name === "fill" ? "cell" :
+      name === "pan"  ? "grab" : "crosshair";
   }
   toolBtns.forEach(b => b.addEventListener("click", () => setTool(b.dataset.tool)));
 
@@ -448,8 +525,25 @@
   }
 
   // ---------- Pointer-Handling ----------
+  let panning = false, panLast = null;
+
+  function rawXY(e) {
+    const p = (e.touches && e.touches[0]) ? e.touches[0] : e;
+    return { x: p.clientX, y: p.clientY };
+  }
+  // Verschieben mit dem ✋-Werkzeug ODER mit zwei Fingern (auch beim Malen).
+  function wantsPan(e) {
+    return state.tool === "pan" || (e.touches && e.touches.length >= 2);
+  }
+
   function start(e) {
     e.preventDefault();
+    if (wantsPan(e)) {
+      panning = true;
+      panLast = rawXY(e);
+      state.drawing = false;
+      return;
+    }
     const p = pos(e);
     if (state.tool === "fill") {
       pushUndo();
@@ -463,6 +557,14 @@
     drawSegment(p, { x: p.x + 0.01, y: p.y + 0.01 });
   }
   function move(e) {
+    if (panning) {
+      e.preventDefault();
+      const r = rawXY(e);
+      scroll.scrollLeft -= (r.x - panLast.x);
+      scroll.scrollTop  -= (r.y - panLast.y);
+      panLast = r;
+      return;
+    }
     if (!state.drawing) return;
     e.preventDefault();
     const p = pos(e);
@@ -472,6 +574,8 @@
   function end() {
     state.drawing = false;
     state.last = null;
+    panning = false;
+    panLast = null;
   }
 
   canvas.addEventListener("mousedown", start);
