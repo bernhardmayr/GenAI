@@ -82,17 +82,33 @@
 
   .sizeVal { font-size: 13px; opacity: 0.7; width: 38px; text-align: left; }
 
-  /* Canvas */
+  /* Canvas — Höhe über die padding-bottom-Technik erzwingen.
+     Der .stage erhält seine Höhe von einem ::before-Pseudo-Element
+     (Seitenverhältnis 920/1100 = 83.6364 %); das Canvas füllt ihn
+     absolut. Diese Technik hält die Höhe seit jeher zuverlässig auf
+     iOS-Safari – unabhängig von der dort unzuverlässigen intrinsischen
+     Höhe eines <canvas>-Elements oder von JavaScript-Timing. */
   .stage {
+    position: relative;
     background: #fff;
     border-radius: 16px;
     box-shadow: 0 18px 40px rgba(0,0,0,0.45);
-    padding: 0; overflow: hidden;
+    overflow: hidden;
     width: 100%;
     max-width: min(1100px, 96vw);
     touch-action: none;
   }
-  canvas { display: block; width: 100%; height: auto; cursor: crosshair; }
+  .stage::before {
+    content: "";
+    display: block;
+    padding-bottom: 83.6364%; /* 920 / 1100 */
+  }
+  canvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    display: block; cursor: crosshair;
+  }
 
   .dinos { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
   button.dino {
