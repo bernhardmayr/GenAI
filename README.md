@@ -62,12 +62,10 @@ Lücken, Leben, Punkte- und Zeit-Anzeige.
 **Steuerung:** ← → / A D laufen, Leertaste/W/↑ springen (Touch-Steuerung auf dem Handy).
 
 ### 🎨 Mal-Atelier (`malen.html`)
-Ein kleines Malprogramm zum freien Zeichnen **und** zum Ausmalen von Dino-Bildern.
+Ein kleines Malprogramm zum freien Zeichnen.
 **Werkzeuge:** Pinsel, Buntstift, Filzer, Wachsmalstift, Sprühdose, Regenbogen-Pinsel,
 Radiergummi und ein **Füll-Werkzeug** (🪣 Flood-Fill) zum flächigen Ausmalen.
 **Farben:** 16er-Palette plus frei wählbare Farbe; einstellbare Stiftgröße.
-**Ausmalbilder:** T-Rex, Stegosaurus, Triceratops, Langhals, Flugsaurier und Dino-Ei –
-als Linien-Vorlage, die mit dem Eimer mit einem Klick koloriert wird.
 **Funktionen:** Rückgängig (auch Strg/⌘+Z), Leinwand leeren und Bild als PNG speichern.
 Maus- und Touch-Bedienung.
 

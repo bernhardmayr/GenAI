@@ -80,50 +80,35 @@
   }
   input[type="range"] { width: 130px; accent-color: #06d6a0; cursor: pointer; }
 
-  .sizeVal { font-size: 13px; opacity: 0.7; width: 56px; text-align: left; }
+  .sizeVal { font-size: 13px; opacity: 0.7; width: 38px; text-align: left; }
 
-  /* Scrollbarer Leinwand-Bereich: die Leinwand darf größer als der
-     Bildschirm sein – dann kann man scrollen bzw. mit ✋ verschieben. */
-  .canvasScroll {
-    width: 100%;
-    max-width: 1100px;
-    max-height: 78vh;
-    overflow: auto;
-    -webkit-overflow-scrolling: touch;
-    border-radius: 16px;
-    background: rgba(0,0,0,0.22);
-    border: 1px solid rgba(255,255,255,0.08);
-    padding: 14px;
-  }
+  /* Canvas — Höhe über die padding-bottom-Technik erzwingen.
+     Der .stage erhält seine Höhe von einem ::before-Pseudo-Element
+     (Seitenverhältnis 920/1100 = 83.6364 %); das Canvas füllt ihn
+     absolut. Diese Technik hält die Höhe seit jeher zuverlässig auf
+     iOS-Safari – unabhängig von der dort unzuverlässigen intrinsischen
+     Höhe eines <canvas>-Elements oder von JavaScript-Timing. */
   .stage {
     position: relative;
     background: #fff;
-    border-radius: 12px;
-    box-shadow: 0 14px 34px rgba(0,0,0,0.45);
+    border-radius: 16px;
+    box-shadow: 0 18px 40px rgba(0,0,0,0.45);
     overflow: hidden;
-    /* Block-Zentrierung: bei Übergröße bleiben die Ränder erreichbar
-       (anders als bei flex/justify-content:center). */
-    margin: 0 auto;
-    width: fit-content;
-    /* Größe richtet sich nach dem Canvas (px per JS) */
+    width: 100%;
+    max-width: min(1100px, 96vw);
     touch-action: none;
+  }
+  .stage::before {
+    content: "";
+    display: block;
+    padding-bottom: 83.6364%; /* 920 / 1100 */
   }
   canvas {
-    display: block;
-    /* Breite UND Höhe werden per JS in px gesetzt (Format × Zoom).
-       Explizite px-Werte direkt am <canvas> – das ist die einzige
-       Variante, die auf iOS-Safari zuverlässig die Höhe hält. */
-    touch-action: none;
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    display: block; cursor: crosshair;
   }
-
-  .dinos { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
-  button.dino {
-    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
-    color: #e8e8f0; border-radius: 11px; padding: 8px 12px; font-size: 14px; cursor: pointer;
-    transition: background 0.12s ease, transform 0.08s ease;
-  }
-  button.dino:hover { background: rgba(142,202,230,0.18); }
-  button.dino:active { transform: scale(0.95); }
 
   footer { opacity: 0.4; font-size: 12px; text-align: center; max-width: 600px; }
 </style>
@@ -132,7 +117,7 @@
   <a class="back" href="index.html">← Spiele</a>
   <header>
     <h1>Mal-Atelier</h1>
-    <p>Mal frei drauflos oder male einen Dino aus 🦕</p>
+    <p>Mal frei drauflos mit vielen Farben und Stiften 🎨</p>
   </header>
 
   <!-- Werkzeugleiste -->
@@ -156,7 +141,6 @@
         <button class="tool" data-tool="fill" title="Flächen füllen">🪣 Füllen</button>
         <button class="tool" data-tool="rainbow" title="Regenbogen-Pinsel">🌈 Regenbogen</button>
         <button class="tool" data-tool="eraser" title="Radiergummi">🧽 Radierer</button>
-        <button class="tool" data-tool="pan" title="Leinwand verschieben (scrollen)">✋ Verschieben</button>
       </div>
     </div>
 
@@ -175,130 +159,19 @@
     </div>
   </div>
 
-  <!-- Leinwand-Einstellungen -->
-  <div class="panel">
-    <div class="row">
-      <div class="group">
-        <span class="label">Format</span>
-        <button class="tool" data-format="1100x900" title="Querformat">🖼️ Quer</button>
-        <button class="tool" data-format="900x1200" title="Hochformat">📄 Hoch</button>
-        <button class="tool" data-format="1000x1000" title="Quadrat">⬛ Quadrat</button>
-        <button class="tool" data-format="2000x1400" title="Riesige Leinwand">➕ Riesig</button>
-      </div>
-      <div class="sep"></div>
-      <div class="group">
-        <span class="label">Zoom</span>
-        <button class="tool" id="zoomOut" title="Verkleinern">➖</button>
-        <input type="range" id="zoom" min="10" max="400" step="5" value="100">
-        <button class="tool" id="zoomIn" title="Vergrößern">➕</button>
-        <span class="sizeVal" id="zoomVal">100 %</span>
-        <button class="tool" id="zoomFit" title="An Bildschirm anpassen">🔳 Einpassen</button>
-      </div>
-    </div>
+  <!-- Leinwand -->
+  <div class="stage">
+    <canvas id="canvas" width="1100" height="920"></canvas>
   </div>
 
-  <!-- Leinwand (scrollbar, darf größer als der Bildschirm sein) -->
-  <div class="canvasScroll" id="canvasScroll">
-    <div class="stage" id="stage">
-      <canvas id="canvas" width="1100" height="900"></canvas>
-    </div>
-  </div>
-
-  <!-- Ausmalbilder -->
-  <div class="panel">
-    <div class="row">
-      <span class="label">Ausmalbild laden</span>
-      <div class="dinos" id="dinos">
-        <button class="dino" data-dino="rex">🦖 T-Rex</button>
-        <button class="dino" data-dino="stego">🦕 Stegosaurus</button>
-        <button class="dino" data-dino="tri">🦏 Triceratops</button>
-        <button class="dino" data-dino="bronto">🦕 Langhals</button>
-        <button class="dino" data-dino="ptero">🦅 Flugsaurier</button>
-        <button class="dino" data-dino="egg">🥚 Dino-Ei</button>
-        <button class="dino" data-dino="blank">⬜ Leeres Blatt</button>
-      </div>
-    </div>
-  </div>
-
-  <footer>Tipp: Stelle <b>Format</b> und <b>Zoom</b> der Leinwand ein – sie darf auch größer als der Bildschirm sein. Mit ✋ <b>Verschieben</b> bewegst du dich über eine große Leinwand. 🪣 <b>Füllen</b> koloriert ganze Flächen mit einem Klick.<span id="diag" style="display:block;opacity:0.7;margin-top:4px;"></span></footer>
+  <footer>Tipp: Mit dem 🪣 <b>Füllen</b>-Werkzeug malst du ganze Flächen mit einem Klick aus. Funktioniert mit Maus und Finger.</footer>
 
 <script>
 "use strict";
 (function () {
-  const canvas = document.getElementById("canvas");   // sichtbares Canvas (nur Anzeige)
-  const vctx = canvas.getContext("2d");
-  const stage = document.getElementById("stage");
-  const scroll = document.getElementById("canvasScroll");
-
-  // Gezeichnet wird auf eine UNSICHTBARE Arbeitsfläche fester Auflösung (doc).
-  // Das sichtbare Canvas zeigt diese Fläche nur skaliert an. Seine Größe
-  // steckt komplett in den Attributen width/height (KEINE CSS-Höhe), darum
-  // kann es auf iOS nicht zu einem Streifen zusammenfallen.
-  const doc = document.createElement("canvas");
-  let W = 1100, H = 900;            // Auflösung der Arbeitsfläche (= Format)
-  doc.width = W; doc.height = H;
-  const ctx = doc.getContext("2d", { willReadFrequently: true });
-
-  // ---------- Leinwandgröße & Zoom ----------
-  let zoom = 100;
-
-  // Arbeitsfläche skaliert ins sichtbare Canvas blitten.
-  function render() {
-    vctx.imageSmoothingEnabled = true;
-    vctx.clearRect(0, 0, canvas.width, canvas.height);
-    vctx.drawImage(doc, 0, 0, W, H, 0, 0, canvas.width, canvas.height);
-  }
-
-  function applyDisplay() {
-    const w = Math.max(1, Math.round(W * zoom / 100));
-    const h = Math.max(1, Math.round(H * zoom / 100));
-    // Größe ausschließlich über die Canvas-Attribute (iOS-sicher).
-    if (canvas.width !== w) canvas.width = w;
-    if (canvas.height !== h) canvas.height = h;
-    render();
-  }
-
-  function setZoom(z, fromSlider) {
-    zoom = Math.max(10, Math.min(400, Math.round(z)));
-    const slider = document.getElementById("zoom");
-    const val = document.getElementById("zoomVal");
-    if (slider && !fromSlider) slider.value = zoom;
-    if (val) val.textContent = zoom + " %";
-    applyDisplay();
-  }
-
-  function fitZoom() {
-    // Zoom so wählen, dass die Leinwand in die Breite des Bereichs passt.
-    const avail = (scroll.clientWidth || 320) - 30;
-    setZoom(Math.max(10, Math.floor(avail / W * 100)));
-  }
-
-  function setFormat(w, h) {
-    // bestehende Zeichnung erhalten (oben links ausgerichtet)
-    const tmp = document.createElement("canvas");
-    tmp.width = W; tmp.height = H;
-    tmp.getContext("2d").drawImage(doc, 0, 0);
-    W = w; H = h;
-    doc.width = w; doc.height = h;
-    fillWhite();
-    ctx.drawImage(tmp, 0, 0);
-    undoStack.length = 0;
-    fitZoom();
-  }
-
-  // Bedienelemente verdrahten
-  document.querySelectorAll("button[data-format]").forEach(b => {
-    b.addEventListener("click", () => {
-      const parts = b.dataset.format.split("x");
-      setFormat(parseInt(parts[0], 10), parseInt(parts[1], 10));
-    });
-  });
-  document.getElementById("zoom").addEventListener("input", (e) => setZoom(parseInt(e.target.value, 10), true));
-  document.getElementById("zoomIn").addEventListener("click", () => setZoom(zoom + 20));
-  document.getElementById("zoomOut").addEventListener("click", () => setZoom(zoom - 20));
-  document.getElementById("zoomFit").addEventListener("click", fitZoom);
-  window.addEventListener("orientationchange", fitZoom);
-  window.addEventListener("load", fitZoom);
+  const canvas = document.getElementById("canvas");
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  const W = canvas.width, H = canvas.height;
 
   // ---------- Zustand ----------
   const state = {
@@ -311,7 +184,7 @@
   };
 
   const undoStack = [];
-  const MAX_UNDO = 12;
+  const MAX_UNDO = 25;
 
   function pushUndo() {
     try {
@@ -326,10 +199,6 @@
     ctx.fillRect(0, 0, W, H);
   }
   fillWhite();
-
-  // Erstanzeige: Größe einpassen und Arbeitsfläche anzeigen.
-  applyDisplay();
-  fitZoom();
 
   // ---------- Farbpalette ----------
   const palette = [
@@ -372,9 +241,7 @@
   function setTool(name) {
     state.tool = name;
     toolBtns.forEach(b => b.classList.toggle("active", b.dataset.tool === name));
-    canvas.style.cursor =
-      name === "fill" ? "cell" :
-      name === "pan"  ? "grab" : "crosshair";
+    canvas.style.cursor = (name === "fill") ? "cell" : "crosshair";
   }
   toolBtns.forEach(b => b.addEventListener("click", () => setTool(b.dataset.tool)));
 
@@ -543,30 +410,12 @@
   }
 
   // ---------- Pointer-Handling ----------
-  let panning = false, panLast = null;
-
-  function rawXY(e) {
-    const p = (e.touches && e.touches[0]) ? e.touches[0] : e;
-    return { x: p.clientX, y: p.clientY };
-  }
-  // Verschieben mit dem ✋-Werkzeug ODER mit zwei Fingern (auch beim Malen).
-  function wantsPan(e) {
-    return state.tool === "pan" || (e.touches && e.touches.length >= 2);
-  }
-
   function start(e) {
     e.preventDefault();
-    if (wantsPan(e)) {
-      panning = true;
-      panLast = rawXY(e);
-      state.drawing = false;
-      return;
-    }
     const p = pos(e);
     if (state.tool === "fill") {
       pushUndo();
       floodFill(p.x, p.y, hexToRgb(strokeStyleFor()));
-      render();
       return;
     }
     pushUndo();
@@ -574,29 +423,17 @@
     state.last = p;
     // Punkt setzen (für Klick ohne Bewegung)
     drawSegment(p, { x: p.x + 0.01, y: p.y + 0.01 });
-    render();
   }
   function move(e) {
-    if (panning) {
-      e.preventDefault();
-      const r = rawXY(e);
-      scroll.scrollLeft -= (r.x - panLast.x);
-      scroll.scrollTop  -= (r.y - panLast.y);
-      panLast = r;
-      return;
-    }
     if (!state.drawing) return;
     e.preventDefault();
     const p = pos(e);
     drawSegment(state.last, p);
     state.last = p;
-    render();
   }
   function end() {
     state.drawing = false;
     state.last = null;
-    panning = false;
-    panLast = null;
   }
 
   canvas.addEventListener("mousedown", start);
@@ -611,208 +448,23 @@
   document.getElementById("undo").addEventListener("click", () => {
     if (!undoStack.length) return;
     ctx.putImageData(undoStack.pop(), 0, 0);
-    render();
   });
   document.getElementById("clear").addEventListener("click", () => {
     pushUndo();
     fillWhite();
-    render();
   });
   document.getElementById("save").addEventListener("click", () => {
     const a = document.createElement("a");
     a.download = "mein-bild.png";
-    a.href = doc.toDataURL("image/png");   // volle Auflösung exportieren
+    a.href = canvas.toDataURL("image/png");
     a.click();
-  });
-
-  // ---------- Ausmalbilder (Dino-Outlines) ----------
-  // Die Vorlagen sind im Koordinatenraum 880×620 gezeichnet und werden
-  // formatfüllend auf die (größere) Leinwand skaliert.
-  const ART_W = 880, ART_H = 620;
-  function newSheet(drawFn) {
-    pushUndo();
-    fillWhite();
-    ctx.save();
-    const s = Math.min(W / ART_W, H / ART_H);
-    ctx.translate((W - ART_W * s) / 2, (H - ART_H * s) / 2);
-    ctx.scale(s, s);
-    ctx.strokeStyle = "#222";
-    ctx.lineWidth = 4 / s;
-    ctx.lineJoin = "round";
-    ctx.lineCap = "round";
-    ctx.fillStyle = "transparent";
-    drawFn(ctx);
-    ctx.restore();
-    render();
-  }
-
-  // Hilfsfunktion: glatte geschlossene Kurve durch Punkte
-  function blob(c, pts, close = true) {
-    c.beginPath();
-    c.moveTo(pts[0][0], pts[0][1]);
-    for (let i = 1; i < pts.length - 1; i++) {
-      const xc = (pts[i][0] + pts[i+1][0]) / 2;
-      const yc = (pts[i][1] + pts[i+1][1]) / 2;
-      c.quadraticCurveTo(pts[i][0], pts[i][1], xc, yc);
-    }
-    const last = pts[pts.length - 1];
-    if (close) {
-      const xc = (last[0] + pts[0][0]) / 2;
-      const yc = (last[1] + pts[0][1]) / 2;
-      c.quadraticCurveTo(last[0], last[1], xc, yc);
-      c.quadraticCurveTo(pts[0][0], pts[0][1], pts[0][0], pts[0][1]);
-      c.closePath();
-    } else {
-      c.lineTo(last[0], last[1]);
-    }
-    c.stroke();
-  }
-
-  function eye(c, x, y, r) {
-    c.beginPath(); c.arc(x, y, r, 0, Math.PI*2); c.stroke();
-    c.beginPath(); c.arc(x, y, Math.max(2, r*0.4), 0, Math.PI*2);
-    c.fillStyle = "#222"; c.fill();
-    c.fillStyle = "transparent";
-  }
-
-  const dinoArt = {
-    rex(c) {
-      // Körper
-      blob(c, [
-        [250,360],[230,300],[250,250],[300,210],[330,150],
-        [360,120],[410,130],[430,170],[400,200],[420,250],
-        [470,270],[560,260],[640,300],[690,360],[660,380],
-        [600,360],[560,380],[560,470],[540,540],[505,540],
-        [495,470],[470,420],[420,430],[420,520],[395,540],
-        [380,470],[370,410],[320,400],[290,420],[270,390]
-      ]);
-      // Bein-/Bauchlinien
-      c.beginPath(); c.moveTo(470,420); c.quadraticCurveTo(430,460,420,520); c.stroke();
-      // Ärmchen
-      c.beginPath(); c.moveTo(470,300); c.quadraticCurveTo(500,330,490,360); c.stroke();
-      c.beginPath(); c.moveTo(490,360); c.lineTo(478,360); c.moveTo(490,360); c.lineTo(490,372); c.stroke();
-      // Auge + Maul
-      eye(c, 390, 175, 11);
-      c.beginPath(); c.moveTo(360,210); c.lineTo(430,205); c.stroke();
-      // Zähne
-      for (let i=0;i<5;i++){ const x=370+i*14; c.beginPath(); c.moveTo(x,205); c.lineTo(x+6,216); c.lineTo(x+12,205); c.stroke(); }
-    },
-    stego(c) {
-      blob(c, [
-        [150,360],[170,320],[230,300],[300,300],[380,300],
-        [460,300],[540,310],[600,330],[660,360],[700,360],
-        [690,380],[650,380],[620,400],[615,470],[590,470],
-        [580,400],[540,400],[520,470],[495,470],[490,400],
-        [330,400],[330,470],[305,470],[300,400],[250,400],
-        [250,470],[225,470],[220,395],[180,390]
-      ]);
-      eye(c, 660, 350, 9);
-      c.beginPath(); c.moveTo(680,368); c.lineTo(700,372); c.stroke();
-      // Rückenplatten
-      const plates = [[260,300],[320,290],[380,285],[440,288],[500,295],[560,308]];
-      plates.forEach(p => {
-        c.beginPath(); c.moveTo(p[0]-26, p[1]);
-        c.quadraticCurveTo(p[0], p[1]-60, p[0]+26, p[1]); c.stroke();
-      });
-      // Schwanzspitzen (Thagomizer)
-      c.beginPath(); c.moveTo(150,360); c.lineTo(110,340); c.moveTo(150,360); c.lineTo(108,360);
-      c.moveTo(160,375); c.lineTo(118,385); c.stroke();
-    },
-    tri(c) {
-      blob(c, [
-        [180,420],[180,360],[230,330],[300,330],[360,340],
-        [380,300],[400,250],[470,240],[560,250],[640,270],
-        [690,300],[700,340],[680,360],[640,380],[600,420],
-        [590,500],[562,500],[555,430],[470,440],[470,500],
-        [443,500],[435,440],[330,440],[300,470],[270,470],
-        [262,440],[230,470],[205,470],[200,430]
-      ]);
-      // Nackenschild
-      c.beginPath(); c.moveTo(400,250); c.quadraticCurveTo(420,170,520,180);
-      c.quadraticCurveTo(620,190,640,270); c.stroke();
-      // Hörner
-      c.beginPath(); c.moveTo(660,300); c.lineTo(720,260); c.stroke();         // Nasenhorn
-      c.beginPath(); c.moveTo(600,250); c.lineTo(640,190); c.stroke();
-      c.beginPath(); c.moveTo(560,255); c.lineTo(585,195); c.stroke();
-      eye(c, 600, 300, 9);
-    },
-    bronto(c) {
-      blob(c, [
-        [150,440],[160,400],[210,380],[280,385],[330,395],
-        [340,330],[330,250],[340,180],[380,140],[440,135],
-        [470,165],[450,200],[420,250],[420,330],[450,360],
-        [560,360],[660,375],[700,410],[690,440],[650,450],
-        [610,450],[600,520],[575,520],[565,450],[490,450],
-        [485,520],[460,520],[450,450],[360,450],[355,520],
-        [330,520],[322,450],[250,448],[245,510],[222,510],
-        [215,448],[180,445]
-      ]);
-      eye(c, 425, 165, 9);
-      c.beginPath(); c.moveTo(395,150); c.lineTo(370,155); c.stroke(); // Maul
-      // Schwanz-Spitze
-      c.beginPath(); c.moveTo(150,440); c.quadraticCurveTo(100,440,80,420); c.stroke();
-    },
-    ptero(c) {
-      // Körper
-      blob(c, [
-        [380,300],[360,270],[370,240],[400,225],[450,235],
-        [470,265],[455,300],[470,340],[450,360],[420,355],
-        [405,330]
-      ]);
-      // Kopf + Schnabel + Kamm
-      c.beginPath(); c.moveTo(450,235); c.lineTo(560,210); c.stroke();   // Oberschnabel
-      c.beginPath(); c.moveTo(455,260); c.lineTo(545,245); c.stroke();   // Unterschnabel
-      c.beginPath(); c.moveTo(560,210); c.lineTo(545,245); c.stroke();   // Spitze
-      c.beginPath(); c.moveTo(420,225); c.lineTo(380,180); c.lineTo(440,215); c.stroke(); // Kamm
-      eye(c, 470, 245, 7);
-      // Flügel links
-      c.beginPath(); c.moveTo(390,275);
-      c.quadraticCurveTo(250,150,120,210);
-      c.quadraticCurveTo(230,250,250,300);
-      c.quadraticCurveTo(180,290,150,330);
-      c.quadraticCurveTo(300,330,390,300); c.stroke();
-      // Flügel rechts
-      c.beginPath(); c.moveTo(440,300);
-      c.quadraticCurveTo(560,200,690,250);
-      c.quadraticCurveTo(600,280,600,330);
-      c.quadraticCurveTo(660,330,690,370);
-      c.quadraticCurveTo(540,360,450,330); c.stroke();
-      // Beine
-      c.beginPath(); c.moveTo(420,355); c.lineTo(430,410); c.lineTo(415,425); c.stroke();
-      c.beginPath(); c.moveTo(450,355); c.lineTo(465,405); c.lineTo(480,418); c.stroke();
-    },
-    egg(c) {
-      // Ei
-      c.beginPath();
-      c.ellipse(440, 340, 150, 200, 0, 0, Math.PI*2);
-      c.stroke();
-      // Zickzack-Sprung
-      c.beginPath();
-      const zz = [[300,330],[340,300],[360,345],[400,310],[420,355],[470,320],[490,360],[540,325],[565,365],[600,335]];
-      c.moveTo(zz[0][0], zz[0][1]);
-      zz.forEach(p => c.lineTo(p[0], p[1]));
-      c.stroke();
-      // Punkte zum Ausmalen
-      const spots = [[400,210],[500,250],[360,420],[520,440],[440,500],[560,180]];
-      spots.forEach(s => { c.beginPath(); c.arc(s[0], s[1], 22, 0, Math.PI*2); c.stroke(); });
-    },
-    blank(c) { /* leeres Blatt */ }
-  };
-
-  document.querySelectorAll("button.dino").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const fn = dinoArt[btn.dataset.dino];
-      if (fn) newSheet(fn);
-      // praktisch: nach dem Laden direkt das Füll-Werkzeug anbieten
-      if (btn.dataset.dino !== "blank") setTool("fill");
-    });
   });
 
   // Tastatur-Komfort
   window.addEventListener("keydown", (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
       e.preventDefault();
-      if (undoStack.length) { ctx.putImageData(undoStack.pop(), 0, 0); render(); }
+      if (undoStack.length) ctx.putImageData(undoStack.pop(), 0, 0);
     }
   });
 })();
