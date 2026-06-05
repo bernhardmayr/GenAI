@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Anzieh-Atelier 👗</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { min-height: 100%; }
+  body {
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: linear-gradient(160deg, #1a1a2e, #16213e);
+    color: #e8e8f0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 14px 12px 32px;
+    gap: 14px;
+    min-height: 100vh;
+  }
+  header { text-align: center; }
+  h1 {
+    font-size: clamp(24px, 6vw, 40px);
+    background: linear-gradient(90deg, #ffd166, #ff5ca8, #8ecae6, #06d6a0);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    letter-spacing: 1px;
+  }
+  header p { opacity: 0.6; font-size: 13px; margin-top: 4px; }
+  a.back { position: fixed; top: 12px; left: 14px; color: #8ecae6; text-decoration: none; font-size: 14px; opacity: 0.8; z-index: 5; }
+  a.back:hover { opacity: 1; }
+
+  .wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    width: 100%;
+    max-width: 1040px;
+    align-items: flex-start;
+    justify-content: center;
+  }
+
+  /* Bühne mit der Figur */
+  .stage {
+    position: relative;
+    background: linear-gradient(180deg, #fef6ff, #e8f4ff);
+    border-radius: 20px;
+    box-shadow: 0 18px 40px rgba(0,0,0,0.45);
+    overflow: hidden;
+    width: 100%;
+    max-width: 340px;
+    flex: 1 1 280px;
+    touch-action: none;
+  }
+  .stage::before { content: ""; display: block; padding-bottom: 145%; }
+  .stage svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: block; }
+
+  .controls { flex: 1 1 460px; min-width: 280px; display: flex; flex-direction: column; gap: 12px; }
+
+  .panel {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    padding: 12px 14px;
+  }
+
+  /* Reiter */
+  .tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+  .tab {
+    flex: 1 1 auto;
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.12);
+    color: #e8e8f0;
+    border-radius: 12px;
+    padding: 11px 10px;
+    font-size: 14px; cursor: pointer;
+    transition: background 0.12s ease, border-color 0.12s ease, transform 0.08s ease;
+    user-select: none; text-align: center;
+  }
+  .tab:hover { background: rgba(255,255,255,0.13); }
+  .tab.active { background: rgba(255,209,102,0.22); border-color: rgba(255,209,102,0.6); }
+
+  .section { display: none; }
+  .section.active { display: block; }
+
+  .label { font-size: 12px; opacity: 0.6; margin: 10px 0 6px; display: block; }
+  .label:first-child { margin-top: 0; }
+
+  .swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+  .swatch {
+    width: 32px; height: 32px; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.25);
+    cursor: pointer; transition: transform 0.1s ease, border-color 0.1s ease;
+  }
+  .swatch:hover { transform: scale(1.12); }
+  .swatch.active { border-color: #fff; transform: scale(1.18); box-shadow: 0 0 0 3px rgba(255,255,255,0.18); }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 7px; }
+  .chip {
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.12);
+    color: #e8e8f0;
+    border-radius: 11px;
+    padding: 9px 13px;
+    font-size: 14px; cursor: pointer;
+    transition: background 0.12s ease, border-color 0.12s ease, transform 0.08s ease;
+    user-select: none;
+  }
+  .chip:hover { background: rgba(255,255,255,0.13); }
+  .chip:active { transform: scale(0.95); }
+  .chip.active { background: rgba(6,214,160,0.2); border-color: rgba(6,214,160,0.55); }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  button.btn {
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.12);
+    color: #e8e8f0;
+    border-radius: 11px;
+    padding: 10px 14px;
+    font-size: 14px; cursor: pointer;
+    transition: background 0.12s ease, border-color 0.12s ease, transform 0.08s ease;
+    user-select: none;
+  }
+  button.btn:hover { background: rgba(255,255,255,0.13); }
+  button.btn:active { transform: scale(0.95); }
+  button.btn.primary { background: rgba(6,214,160,0.18); border-color: rgba(6,214,160,0.5); }
+  button.btn.pink { background: rgba(255,92,168,0.18); border-color: rgba(255,92,168,0.5); }
+
+  /* Kleiderschrank */
+  .wardrobe { display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 8px; }
+  .item {
+    position: relative;
+    background: rgba(255,255,255,0.06);
+    border: 2px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    padding: 4px; cursor: pointer;
+    transition: transform 0.1s ease, border-color 0.1s ease;
+  }
+  .item:hover { transform: translateY(-2px); }
+  .item.worn { border-color: #06d6a0; box-shadow: 0 0 0 2px rgba(6,214,160,0.25); }
+  .item svg { width: 100%; height: 56px; display: block; }
+  .item .x {
+    position: absolute; top: -7px; right: -7px;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: #ef476f; color: #fff; border: none;
+    font-size: 13px; line-height: 18px; cursor: pointer; display: none;
+  }
+  .item.custom .x { display: block; }
+  .preview-mini { width: 110px; height: 130px; background: rgba(255,255,255,0.06); border-radius: 12px; display: block; margin: 4px auto 0; }
+
+  footer { opacity: 0.4; font-size: 12px; text-align: center; max-width: 600px; }
+</style>
+</head>
+<body>
+  <a class="back" href="index.html">← Spiele</a>
+  <header>
+    <h1>Anzieh-Atelier</h1>
+    <p>Erschaffe eine Figur, zieh sie an und nähe eigene Kleider 👗✂️</p>
+  </header>
+
+  <div class="wrap">
+    <div class="stage" id="stage"></div>
+
+    <div class="controls">
+      <div class="panel">
+        <div class="tabs">
+          <button class="tab active" data-tab="person">🧍 Figur</button>
+          <button class="tab" data-tab="dress">👕 Anziehen</button>
+          <button class="tab" data-tab="sew">✂️ Schneiderei</button>
+        </div>
+      </div>
+
+      <!-- FIGUR -->
+      <div class="panel section active" id="sec-person">
+        <span class="label">Hautfarbe</span>
+        <div class="swatches" id="skinSw"></div>
+        <span class="label">Frisur</span>
+        <div class="chips" id="hairStyle"></div>
+        <span class="label">Haarfarbe</span>
+        <div class="swatches" id="hairSw"></div>
+        <span class="label">Augen</span>
+        <div class="chips" id="eyesChips"></div>
+        <span class="label">Mund</span>
+        <div class="chips" id="mouthChips"></div>
+        <span class="label">Hintergrund</span>
+        <div class="swatches" id="bgSw"></div>
+      </div>
+
+      <!-- ANZIEHEN -->
+      <div class="panel section" id="sec-dress">
+        <span class="label">Tipp auf ein Kleidungsstück, um es an- oder auszuziehen.</span>
+        <div class="wardrobe" id="wardrobe"></div>
+        <div class="actions" style="margin-top:12px">
+          <button class="btn" id="undressBtn">🩲 Alles ausziehen</button>
+        </div>
+      </div>
+
+      <!-- SCHNEIDEREI -->
+      <div class="panel section" id="sec-sew">
+        <span class="label">Was möchtest du nähen?</span>
+        <div class="chips" id="sewType"></div>
+        <span class="label">Grundfarbe</span>
+        <div class="swatches" id="sewBase"></div>
+        <span class="label">Muster</span>
+        <div class="chips" id="sewPattern"></div>
+        <span class="label">Musterfarbe</span>
+        <div class="swatches" id="sewPatternColor"></div>
+        <svg class="preview-mini" id="sewPreview" viewBox="0 0 110 130"></svg>
+        <div class="actions" style="margin-top:10px">
+          <button class="btn pink" id="addClothes">＋ In den Schrank legen</button>
+          <button class="btn primary" id="tryClothes">👗 Gleich anziehen</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="actions">
+          <button class="btn" id="randomBtn">🎲 Zufall</button>
+          <button class="btn" id="saveBtn">💾 Bild speichern</button>
+          <button class="btn" id="resetBtn">↺ Neu anfangen</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>Alles wird auf deinem Gerät gespeichert · Selbst genähte Kleider bleiben im Schrank.</footer>
+
+<script>
+/* ====================== Daten ====================== */
+const SKIN   = ['#ffe0bd','#f6cda0','#e2b07d','#c68642','#9c6437','#6b4226'];
+const HAIRC  = ['#1b1b1b','#4a3220','#7a4a23','#b06a2c','#d9a441','#ecd28a','#c23a3a','#ff5ca8','#7b6cff','#2e9e6b','#9aa0a6'];
+const GARMENT= ['#ef476f','#ff8c42','#ffd166','#06d6a0','#118ab2','#3a86ff','#7b6cff','#9b5de5','#ff5ca8','#ffffff','#2b2b2b','#8d5524'];
+const BG     = ['#e8f4ff','#fde7f3','#e7fbef','#fff4d6','#ece8ff','#dfe7ef'];
+
+const HAIRSTYLES = [
+  {id:'short',   name:'Kurz 💇'},
+  {id:'long',    name:'Lang 👩'},
+  {id:'ponytail',name:'Zopf 🎀'},
+  {id:'bun',     name:'Dutt 🧁'},
+  {id:'curly',   name:'Locken 🌀'},
+  {id:'spiky',   name:'Punk ⚡'},
+  {id:'bald',    name:'Glatze 🥚'},
+];
+const EYES = [
+  {id:'normal',name:'Normal 👀'},
+  {id:'happy', name:'Froh ^^'},
+  {id:'wink',  name:'Zwinker 😉'},
+  {id:'sleepy',name:'Müde 😴'},
+];
+const MOUTHS = [
+  {id:'smile', name:'Lächeln 🙂'},
+  {id:'grin',  name:'Grinsen 😁'},
+  {id:'neutral',name:'Ernst 😐'},
+  {id:'oh',    name:'Oh! 😮'},
+];
+const SEWTYPES = [
+  {id:'top',  name:'Oberteil 👕'},
+  {id:'pants',name:'Hose 👖'},
+  {id:'dress',name:'Kleid 👗'},
+  {id:'skirt',name:'Rock 🩳'},
+];
+const PATTERNS = [
+  {id:'solid', name:'Einfarbig'},
+  {id:'stripes',name:'Streifen'},
+  {id:'dots',  name:'Punkte'},
+  {id:'hearts',name:'Herzen'},
+  {id:'stars', name:'Sterne'},
+  {id:'checks',name:'Karos'},
+];
+
+/* Vorgefertigte Kleider im Schrank */
+const PRESETS = [
+  {type:'top',   base:'#ef476f', pattern:'solid',   pcolor:'#fff'},
+  {type:'top',   base:'#3a86ff', pattern:'stripes', pcolor:'#ffffff'},
+  {type:'top',   base:'#06d6a0', pattern:'dots',    pcolor:'#ffffff'},
+  {type:'pants', base:'#3b5b8c', pattern:'solid',   pcolor:'#fff'},
+  {type:'pants', base:'#2b2b2b', pattern:'solid',   pcolor:'#fff'},
+  {type:'skirt', base:'#ffd166', pattern:'checks',  pcolor:'#e08a00'},
+  {type:'dress', base:'#ff5ca8', pattern:'hearts',  pcolor:'#ffffff'},
+  {type:'dress', base:'#7b6cff', pattern:'stars',   pcolor:'#ffe066'},
+  {type:'shoes', base:'#e63946', pattern:'solid',   pcolor:'#fff'},
+  {type:'shoes', base:'#2b2b2b', pattern:'solid',   pcolor:'#fff'},
+  {type:'hat',   base:'#ef476f', pattern:'solid',   pcolor:'#fff'},
+  {type:'hat',   base:'#06d6a0', pattern:'dots',    pcolor:'#fff'},
+];
+
+/* In welchen Slot kommt ein Kleidungstyp */
+const SLOT = {top:'top', pants:'bottom', skirt:'bottom', dress:'dress', shoes:'shoes', hat:'hat'};
+
+/* ====================== Zustand ====================== */
+const DEFAULT = {
+  skin:SKIN[1], hair:HAIRC[1], hairStyle:'short', eyes:'normal', mouth:'smile', bg:BG[0],
+  worn:{top:null, bottom:null, dress:null, shoes:null, hat:null}
+};
+let state = load('aa_state', structuredClone(DEFAULT));
+let closet = load('aa_closet', PRESETS.map(p=>({...p, id:'c'+Math.random().toString(36).slice(2,8)})));
+let sew = {type:'top', base:'#ef476f', pattern:'dots', pcolor:'#ffffff'};
+
+function load(k,d){ try{ const v=JSON.parse(localStorage.getItem(k)); return v??d; }catch(e){ return d; } }
+function save(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
+function persist(){ save('aa_state',state); save('aa_closet',closet); }
+
+/* ====================== Muster ====================== */
+let patSeq = 0;
+function patternDef(type, color){
+  if(type==='solid') return {id:null, def:''};
+  const id = 'pat'+(patSeq++);
+  let inner='';
+  if(type==='stripes'){
+    inner = `<rect width="18" height="18" fill="none"/><rect x="0" width="9" height="18" fill="${color}" opacity="0.85"/>`;
+    return wrap(id,18,18,inner);
+  }
+  if(type==='checks'){
+    inner = `<rect width="9" height="9" fill="${color}" opacity="0.8"/><rect x="9" y="9" width="9" height="9" fill="${color}" opacity="0.8"/>`;
+    return wrap(id,18,18,inner);
+  }
+  if(type==='dots'){
+    inner = `<circle cx="9" cy="9" r="3.4" fill="${color}"/>`;
+    return wrap(id,20,20,inner);
+  }
+  if(type==='hearts'){
+    inner = `<path transform="translate(10,10) scale(0.5)" d="M0 4 C0 -3 -9 -3 -9 3 C-9 8 0 13 0 13 C0 13 9 8 9 3 C9 -3 0 -3 0 4 Z" fill="${color}"/>`;
+    return wrap(id,22,22,inner);
+  }
+  if(type==='stars'){
+    inner = `<path transform="translate(11,11) scale(0.85)" d="M0 -7 L2 -2 L7 -2 L3 1 L4 6 L0 3 L-4 6 L-3 1 L-7 -2 L-2 -2 Z" fill="${color}"/>`;
+    return wrap(id,24,24,inner);
+  }
+  return {id:null, def:''};
+  function wrap(id,w,h,inner){
+    return {id, def:`<pattern id="${id}" width="${w}" height="${h}" patternUnits="userSpaceOnUse">${inner}</pattern>`};
+  }
+}
+
+/* Fülle eine Form: Grundfarbe + Muster-Overlay derselben Form */
+function painted(shape, garment){
+  if(!garment) return '';
+  const {def,id} = patternDef(garment.pattern, garment.pcolor);
+  defs += def;
+  const base  = shape.replace('%FILL%', garment.base);
+  const over  = id ? shape.replace('%FILL%', `url(#${id})`) : '';
+  return base + over;
+}
+
+/* ====================== Figur zeichnen ====================== */
+let defs = '';
+function buildCharacter(st){
+  defs = '';
+  const sk = st.skin, hairC = st.hair;
+  const w = st.worn;
+
+  /* Körperteile */
+  const head = `<ellipse cx="150" cy="120" rx="48" ry="52" fill="${sk}"/>`;
+  const ears = `<circle cx="103" cy="122" r="11" fill="${sk}"/><circle cx="197" cy="122" r="11" fill="${sk}"/>`;
+  const neck = `<rect x="136" y="160" width="28" height="26" rx="10" fill="${sk}"/>`;
+  const torso= `<path d="M108 188 Q150 176 192 188 L184 312 Q150 322 116 312 Z" fill="${sk}"/>`;
+  const armL = `<path d="M112 196 Q92 200 90 250 L96 300 Q108 302 110 292 L106 250 Q108 214 120 210 Z" fill="${sk}"/>`;
+  const armR = `<path d="M188 196 Q208 200 210 250 L204 300 Q192 302 190 292 L194 250 Q192 214 180 210 Z" fill="${sk}"/>`;
+  const handL= `<circle cx="100" cy="304" r="11" fill="${sk}"/>`;
+  const handR= `<circle cx="200" cy="304" r="11" fill="${sk}"/>`;
+  const legL = `<path d="M120 312 L118 432 Q118 442 132 442 L146 432 L148 314 Z" fill="${sk}"/>`;
+  const legR = `<path d="M180 312 L182 432 Q182 442 168 442 L154 432 L152 314 Z" fill="${sk}"/>`;
+  const footBase = `<ellipse cx="125" cy="446" rx="20" ry="11" fill="%FILL%"/><ellipse cx="175" cy="446" rx="20" ry="11" fill="%FILL%"/>`;
+
+  /* Gesicht */
+  const face = drawFace(st);
+
+  /* Haare */
+  const [hairBack, hairFront] = drawHair(st.hairStyle, hairC);
+
+  /* Kleidung */
+  const dress  = w.dress  ? clothShape('dress', w.dress)  : '';
+  const top    = (!w.dress && w.top)   ? clothShape('top',   w.top)   : '';
+  const bottom = (!w.dress && w.bottom)? clothShape(w.bottom.type, w.bottom) : '';
+  const shoes  = w.shoes ? painted(footBase, {...w.shoes, pattern:'solid'}) : '';
+  const hat    = w.hat   ? clothShape('hat', w.hat) : '';
+
+  /* Reihenfolge: hinten -> vorne */
+  const svg = `
+  <svg viewBox="0 0 300 435" xmlns="http://www.w3.org/2000/svg">
+    <defs>%DEFS%</defs>
+    <rect x="0" y="0" width="300" height="435" fill="${st.bg}"/>
+    <g transform="translate(0,-25)">
+      ${hairBack}
+      ${legL}${legR}
+      ${shoes}
+      ${bottom}
+      ${armL}${armR}
+      ${torso}
+      ${dress}${top}
+      ${handL}${handR}
+      ${neck}
+      ${ears}
+      ${head}
+      ${face}
+      ${hairFront}
+      ${hat}
+    </g>
+  </svg>`;
+  return svg.replace('%DEFS%', defs);
+}
+
+function drawFace(st){
+  let eyes='';
+  const ex=132, ey=118, rx=168;
+  if(st.eyes==='normal'){
+    eyes = dot(ex,ey)+dot(rx,ey);
+  } else if(st.eyes==='happy'){
+    eyes = arc(ex,ey)+arc(rx,ey);
+  } else if(st.eyes==='wink'){
+    eyes = dot(ex,ey)+`<path d="M160 ${ey} q8 -5 16 0" stroke="#2b2b2b" stroke-width="3" fill="none" stroke-linecap="round"/>`;
+  } else if(st.eyes==='sleepy'){
+    eyes = `<path d="M${ex-7} ${ey} q7 4 14 0" stroke="#2b2b2b" stroke-width="3" fill="none" stroke-linecap="round"/>`+
+           `<path d="M${rx-7} ${ey} q7 4 14 0" stroke="#2b2b2b" stroke-width="3" fill="none" stroke-linecap="round"/>`;
+  }
+  const blush = `<circle cx="120" cy="138" r="8" fill="#ff7a9c" opacity="0.35"/><circle cx="180" cy="138" r="8" fill="#ff7a9c" opacity="0.35"/>`;
+  let mouth='';
+  const my=148;
+  if(st.mouth==='smile')  mouth = `<path d="M138 ${my} q12 12 24 0" stroke="#c0392b" stroke-width="3.5" fill="none" stroke-linecap="round"/>`;
+  if(st.mouth==='grin')   mouth = `<path d="M136 ${my-2} q14 16 28 0 z" fill="#fff" stroke="#c0392b" stroke-width="2.5"/>`;
+  if(st.mouth==='neutral')mouth = `<line x1="140" y1="${my+2}" x2="160" y2="${my+2}" stroke="#c0392b" stroke-width="3.5" stroke-linecap="round"/>`;
+  if(st.mouth==='oh')     mouth = `<ellipse cx="150" cy="${my+1}" rx="7" ry="9" fill="#c0392b"/>`;
+  return eyes+blush+mouth;
+  function dot(x,y){ return `<circle cx="${x}" cy="${y}" r="5.5" fill="#2b2b2b"/><circle cx="${x+1.6}" cy="${y-1.6}" r="1.8" fill="#fff"/>`; }
+  function arc(x,y){ return `<path d="M${x-7} ${y+2} q7 -9 14 0" stroke="#2b2b2b" stroke-width="3.5" fill="none" stroke-linecap="round"/>`; }
+}
+
+function drawHair(style, c){
+  let back='', front='';
+  if(style==='bald') return ['',''];
+  // Standard-Kappe über der Stirn
+  const cap = `<path d="M101 124 C97 56 203 56 199 124 C199 100 192 86 182 84 C184 74 176 66 166 70 C160 60 150 60 150 60 C150 60 140 60 134 70 C124 66 116 74 118 84 C108 86 101 100 101 124 Z" fill="${c}"/>`;
+  if(style==='short'){ front = cap; }
+  else if(style==='long'){
+    back = `<path d="M98 120 C94 58 206 58 202 120 L206 300 Q206 312 192 310 L188 200 Q190 150 150 148 Q110 150 112 200 L108 310 Q94 312 94 300 Z" fill="${c}"/>`;
+    front = cap;
+  }
+  else if(style==='ponytail'){
+    back = `<path d="M196 100 q34 6 30 60 q-4 40 -26 56 q14 -36 8 -64 q-4 -30 -12 -52 z" fill="${c}"/>`;
+    front = cap + `<circle cx="196" cy="96" r="9" fill="${c}"/>`;
+  }
+  else if(style==='bun'){
+    front = cap + `<circle cx="150" cy="58" r="20" fill="${c}"/>`;
+  }
+  else if(style==='curly'){
+    const blobs = [[112,84,18],[140,66,20],[170,64,20],[192,86,18],[104,108,15],[200,108,15],[150,58,18]];
+    front = blobs.map(b=>`<circle cx="${b[0]}" cy="${b[1]}" r="${b[2]}" fill="${c}"/>`).join('') + cap;
+  }
+  else if(style==='spiky'){
+    front = cap + `<path d="M104 96 L110 56 L126 88 L140 50 L152 86 L166 50 L180 88 L196 60 L200 100 Z" fill="${c}"/>`;
+  }
+  return [back, front];
+}
+
+/* Kleidungsform pro Typ, eingefärbt + Muster */
+function clothShape(type, garment){
+  if(type==='top'){
+    const s = `<path d="M104 184 Q150 170 196 184 L210 214 Q204 250 192 240 L184 226 L184 318 Q150 330 116 318 L116 226 L108 240 Q96 250 90 214 Z" fill="%FILL%"/>`;
+    return painted(s, garment) + `<path d="M104 184 Q150 170 196 184" stroke="rgba(0,0,0,0.12)" stroke-width="2" fill="none"/>`;
+  }
+  if(type==='pants'){
+    const s = `<path d="M112 308 Q150 300 188 308 L184 326 L172 440 Q170 450 156 448 L152 360 L150 350 L148 360 L144 448 Q130 450 128 440 L116 326 Z" fill="%FILL%"/>`;
+    return painted(s, garment);
+  }
+  if(type==='skirt'){
+    const s = `<path d="M114 306 Q150 298 186 306 L210 392 Q150 410 90 392 Z" fill="%FILL%"/>`;
+    return painted(s, garment);
+  }
+  if(type==='dress'){
+    const s = `<path d="M104 184 Q150 170 196 184 L208 220 Q200 248 190 240 L188 250 L218 400 Q150 422 82 400 L112 250 L110 240 Q100 248 92 220 Z" fill="%FILL%"/>`;
+    return painted(s, garment) + `<path d="M104 184 Q150 170 196 184" stroke="rgba(0,0,0,0.12)" stroke-width="2" fill="none"/>`;
+  }
+  if(type==='hat'){
+    const s = `<path d="M96 96 Q150 80 204 96 L196 102 Q150 90 104 102 Z" fill="%FILL%"/>`+
+              `<path d="M112 98 Q150 36 188 98 Q150 84 112 98 Z" fill="%FILL%"/>`;
+    return painted(s, garment);
+  }
+  return '';
+}
+
+/* ====================== Render ====================== */
+function render(){
+  document.getElementById('stage').innerHTML = buildCharacter(state);
+}
+
+/* Mini-Vorschau für ein einzelnes Kleidungsstück (auf einer Mini-Figur) */
+function itemIcon(g, size){
+  const st = structuredClone(DEFAULT);
+  st.bg = 'rgba(0,0,0,0)';
+  const slot = SLOT[g.type];
+  st.worn[slot] = (g.type==='pants'||g.type==='skirt') ? {...g} : {...g};
+  // nur das eine Teil zeigen
+  st.worn = {top:null,bottom:null,dress:null,shoes:null,hat:null};
+  if(slot==='bottom') st.worn.bottom = {...g, type:g.type};
+  else st.worn[slot] = {...g, type:g.type};
+  return buildCharacter(st);
+}
+
+/* Vorschau in der Schneiderei */
+function renderSewPreview(){
+  const g = {...sew, type:sew.type};
+  defs='';
+  let shape='';
+  if(sew.type==='top')   shape = clothShape('top',   g);
+  if(sew.type==='pants') shape = clothShape('pants', g);
+  if(sew.type==='skirt') shape = clothShape('skirt', g);
+  if(sew.type==='dress') shape = clothShape('dress', g);
+  const svg = `<defs>${defs}</defs><g transform="translate(0,-150) scale(0.42) translate(-10,0)">${shape}</g>`;
+  document.getElementById('sewPreview').innerHTML = svg;
+}
+
+/* ====================== Kleiderschrank ====================== */
+function renderWardrobe(){
+  const wd = document.getElementById('wardrobe');
+  wd.innerHTML='';
+  closet.forEach(g=>{
+    const slot = SLOT[g.type];
+    const wornG = state.worn[slot];
+    const isWorn = wornG && wornG.id===g.id;
+    const el = document.createElement('div');
+    el.className = 'item'+(isWorn?' worn':'')+(g.preset?'':' custom');
+    el.innerHTML = `<svg viewBox="50 60 200 250">${stripSvg(itemIcon(g))}</svg>`+
+                   (g.preset?'':`<button class="x" title="Löschen">×</button>`);
+    el.querySelector('svg').onclick = ()=>toggleWear(g);
+    el.firstChild.onclick = ()=>toggleWear(g);
+    const x = el.querySelector('.x');
+    if(x) x.onclick = (e)=>{ e.stopPropagation(); deleteCloth(g.id); };
+    el.onclick = (e)=>{ if(e.target.classList.contains('x')) return; toggleWear(g); };
+    wd.appendChild(el);
+  });
+}
+function stripSvg(full){
+  return full.replace(/^[\s\S]*?<svg[^>]*>/,'').replace(/<\/svg>\s*$/,'');
+}
+
+function toggleWear(g){
+  const slot = SLOT[g.type];
+  const cur = state.worn[slot];
+  if(cur && cur.id===g.id){ state.worn[slot]=null; }
+  else {
+    state.worn[slot] = {...g};
+    if(slot==='dress'){ /* Kleid: nichts weiter */ }
+    if(slot==='top' || slot==='bottom'){ state.worn.dress=null; }
+  }
+  persist(); render(); renderWardrobe();
+}
+function deleteCloth(id){
+  closet = closet.filter(c=>c.id!==id);
+  for(const s in state.worn){ if(state.worn[s] && state.worn[s].id===id) state.worn[s]=null; }
+  persist(); render(); renderWardrobe();
+}
+
+/* ====================== Steuer-UI aufbauen ====================== */
+function swatchRow(container, colors, getActive, onPick){
+  const c = document.getElementById(container); c.innerHTML='';
+  colors.forEach(col=>{
+    const s=document.createElement('div'); s.className='swatch'; s.style.background=col;
+    if(getActive()===col) s.classList.add('active');
+    s.onclick=()=>{ onPick(col); };
+    c.appendChild(s);
+  });
+}
+function chipRow(container, items, getActive, onPick){
+  const c=document.getElementById(container); c.innerHTML='';
+  items.forEach(it=>{
+    const b=document.createElement('button'); b.className='chip'; b.textContent=it.name;
+    if(getActive()===it.id) b.classList.add('active');
+    b.onclick=()=>{ onPick(it.id); };
+    c.appendChild(b);
+  });
+}
+
+function buildControls(){
+  swatchRow('skinSw', SKIN, ()=>state.skin, v=>{state.skin=v;persist();render();buildControls();});
+  chipRow('hairStyle', HAIRSTYLES, ()=>state.hairStyle, v=>{state.hairStyle=v;persist();render();buildControls();});
+  swatchRow('hairSw', HAIRC, ()=>state.hair, v=>{state.hair=v;persist();render();buildControls();});
+  chipRow('eyesChips', EYES, ()=>state.eyes, v=>{state.eyes=v;persist();render();buildControls();});
+  chipRow('mouthChips', MOUTHS, ()=>state.mouth, v=>{state.mouth=v;persist();render();buildControls();});
+  swatchRow('bgSw', BG, ()=>state.bg, v=>{state.bg=v;persist();render();buildControls();});
+
+  chipRow('sewType', SEWTYPES, ()=>sew.type, v=>{sew.type=v;renderSewPreview();buildControls();});
+  swatchRow('sewBase', GARMENT, ()=>sew.base, v=>{sew.base=v;renderSewPreview();buildControls();});
+  chipRow('sewPattern', PATTERNS, ()=>sew.pattern, v=>{sew.pattern=v;renderSewPreview();buildControls();});
+  swatchRow('sewPatternColor', GARMENT, ()=>sew.pcolor, v=>{sew.pcolor=v;renderSewPreview();buildControls();});
+}
+
+/* ====================== Aktionen ====================== */
+document.querySelectorAll('.tab').forEach(t=>{
+  t.onclick=()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.section').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById('sec-'+t.dataset.tab).classList.add('active');
+  };
+});
+
+document.getElementById('addClothes').onclick = ()=>{
+  const g = {...sew, id:'c'+Math.random().toString(36).slice(2,8)};
+  closet.push(g); persist(); renderWardrobe();
+  flash('addClothes','✓ Im Schrank!');
+};
+document.getElementById('tryClothes').onclick = ()=>{
+  const g = {...sew, id:'c'+Math.random().toString(36).slice(2,8)};
+  closet.push(g); toggleWear(g);
+  document.querySelector('.tab[data-tab="dress"]').click();
+};
+document.getElementById('undressBtn').onclick = ()=>{
+  state.worn={top:null,bottom:null,dress:null,shoes:null,hat:null};
+  persist(); render(); renderWardrobe();
+};
+document.getElementById('randomBtn').onclick = ()=>{
+  const pick=a=>a[Math.floor(Math.random()*a.length)];
+  state.skin=pick(SKIN); state.hair=pick(HAIRC); state.hairStyle=pick(HAIRSTYLES).id;
+  state.eyes=pick(EYES).id; state.mouth=pick(MOUTHS).id; state.bg=pick(BG);
+  state.worn={top:null,bottom:null,dress:null,shoes:null,hat:null};
+  const byType=t=>closet.filter(c=>c.type===t);
+  if(Math.random()<0.45 && byType('dress').length){ toggleWearSilent(pick(byType('dress'))); }
+  else {
+    if(byType('top').length)  toggleWearSilent(pick(byType('top')));
+    const bottoms=closet.filter(c=>c.type==='pants'||c.type==='skirt');
+    if(bottoms.length) toggleWearSilent(pick(bottoms));
+  }
+  if(byType('shoes').length && Math.random()<0.8) toggleWearSilent(pick(byType('shoes')));
+  if(byType('hat').length && Math.random()<0.45) toggleWearSilent(pick(byType('hat')));
+  persist(); render(); renderWardrobe(); buildControls();
+};
+function toggleWearSilent(g){ const slot=SLOT[g.type]; state.worn[slot]={...g}; }
+
+document.getElementById('resetBtn').onclick = ()=>{
+  if(!confirm('Figur und Schrank zurücksetzen? Selbst genähte Kleider gehen verloren.')) return;
+  state=structuredClone(DEFAULT);
+  closet=PRESETS.map(p=>({...p, preset:true, id:'c'+Math.random().toString(36).slice(2,8)}));
+  persist(); render(); renderWardrobe(); buildControls();
+};
+
+document.getElementById('saveBtn').onclick = ()=>{
+  const svg = document.querySelector('#stage svg');
+  const xml = new XMLSerializer().serializeToString(svg);
+  const img = new Image();
+  const svg64 = 'data:image/svg+xml;base64,'+btoa(unescape(encodeURIComponent(xml)));
+  img.onload = ()=>{
+    const c=document.createElement('canvas'); c.width=600; c.height=870;
+    const ctx=c.getContext('2d'); ctx.drawImage(img,0,0,600,870);
+    const a=document.createElement('a'); a.download='meine-figur.png'; a.href=c.toDataURL('image/png'); a.click();
+  };
+  img.src=svg64;
+};
+
+function flash(id,msg){
+  const b=document.getElementById(id); const o=b.textContent; b.textContent=msg;
+  setTimeout(()=>b.textContent=o,1100);
+}
+
+/* Presets als preset markieren beim allerersten Start */
+closet.forEach(c=>{ if(c.preset===undefined && PRESETS.some(p=>p.base===c.base&&p.type===c.type&&p.pattern===c.pattern)) c.preset=true; });
+
+/* ====================== Start ====================== */
+buildControls();
+renderSewPreview();
+renderWardrobe();
+render();
+</script>
+</body>
+</html>
