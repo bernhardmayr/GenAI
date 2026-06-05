@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vivis Tierpraxis 🐾</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { min-height: 100%; }
+  body {
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: linear-gradient(160deg, #1a1a2e, #16213e);
+    color: #e8e8f0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 14px 12px 32px;
+    gap: 14px;
+    min-height: 100vh;
+  }
+  header { text-align: center; }
+  h1 {
+    font-size: clamp(24px, 6vw, 40px);
+    background: linear-gradient(90deg, #ffd166, #ff5ca8, #8ecae6, #06d6a0);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    letter-spacing: 1px;
+  }
+  header p { opacity: 0.6; font-size: 13px; margin-top: 4px; }
+  a.back { position: fixed; top: 12px; left: 14px; color: #8ecae6; text-decoration: none; font-size: 14px; opacity: 0.8; z-index: 25; }
+  a.back:hover { opacity: 1; }
+
+  .wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    width: 100%;
+    max-width: 980px;
+    align-items: flex-start;
+    justify-content: center;
+  }
+
+  .stage {
+    position: relative;
+    background: linear-gradient(180deg, #fef6ff, #e6f3ff);
+    border-radius: 20px;
+    box-shadow: 0 18px 40px rgba(0,0,0,0.45);
+    overflow: hidden;
+    width: 100%;
+    max-width: 360px;
+    flex: 1 1 300px;
+    touch-action: manipulation;
+    cursor: pointer;
+  }
+  .stage::before { content: ""; display: block; padding-bottom: 100%; }
+  .stage svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: block; }
+  .stage.shake { animation: shake 0.35s; }
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    20% { transform: translateX(-7px); } 40% { transform: translateX(7px); }
+    60% { transform: translateX(-5px); } 80% { transform: translateX(5px); }
+  }
+  .sym { transform-box: fill-box; transform-origin: center; transition: opacity 0.25s ease, transform 0.25s ease; }
+  .sym.cured { opacity: 0; transform: scale(0.4); }
+
+  .confetti { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .confetti span { position: absolute; top: -12%; font-size: 22px; animation: fall linear forwards; }
+  @keyframes fall { to { transform: translateY(380px) rotate(380deg); opacity: 0; } }
+
+  .controls { flex: 1 1 420px; min-width: 280px; display: flex; flex-direction: column; gap: 12px; }
+  .panel {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    padding: 12px 14px;
+  }
+  .panel h3 { font-size: 13px; opacity: 0.6; font-weight: 600; margin-bottom: 8px; }
+  .ask { font-size: 17px; line-height: 1.35; }
+  .ask b { color: #ffd166; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 7px; }
+  .chip {
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.12);
+    color: #e8e8f0;
+    border-radius: 11px;
+    padding: 7px 11px;
+    font-size: 13px;
+    user-select: none;
+  }
+  .chip.done { opacity: 0.4; text-decoration: line-through; }
+
+  .tools { display: flex; flex-wrap: wrap; gap: 8px; }
+  .tool {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 66px; flex: 1 1 66px;
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.12);
+    color: #e8e8f0; border-radius: 13px;
+    padding: 8px 6px; cursor: pointer;
+    transition: background 0.12s ease, border-color 0.12s ease, transform 0.08s ease;
+    user-select: none;
+  }
+  .tool:hover { background: rgba(255,255,255,0.13); }
+  .tool:active { transform: scale(0.95); }
+  .tool.active { background: rgba(255,209,102,0.22); border-color: rgba(255,209,102,0.65); transform: translateY(-2px); }
+  .tool .em { font-size: 26px; line-height: 1; }
+  .tool .nm { font-size: 11px; opacity: 0.75; }
+
+  .meter { height: 18px; background: rgba(255,255,255,0.1); border-radius: 10px; overflow: hidden; }
+  .meter > i { display: block; height: 100%; width: 0; border-radius: 10px;
+    background: linear-gradient(90deg, #06d6a0, #8ee6c8); transition: width 0.35s ease; }
+  .meterLbl { font-size: 12px; opacity: 0.6; margin-bottom: 6px; display: flex; justify-content: space-between; }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  button.btn {
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.12);
+    color: #e8e8f0; border-radius: 11px;
+    padding: 10px 14px; font-size: 14px; cursor: pointer;
+    transition: background 0.12s ease, border-color 0.12s ease, transform 0.08s ease;
+    user-select: none;
+  }
+  button.btn:hover { background: rgba(255,255,255,0.13); }
+  button.btn:active { transform: scale(0.95); }
+  button.btn.primary { background: rgba(6,214,160,0.18); border-color: rgba(6,214,160,0.5); }
+  button.btn.pink { background: rgba(255,92,168,0.18); border-color: rgba(255,92,168,0.5); }
+  button.btn:disabled { opacity: 0.35; cursor: default; transform: none; }
+
+  .album { display: grid; grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); gap: 8px; }
+  .sticker { background: rgba(255,255,255,0.07); border-radius: 12px; padding: 3px; }
+  .sticker svg { width: 100%; display: block; border-radius: 9px; }
+  .albumEmpty { font-size: 13px; opacity: 0.55; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%) translateY(8px);
+    background: rgba(20,24,42,0.94); border: 1px solid rgba(255,255,255,0.16);
+    padding: 11px 18px; border-radius: 13px; font-size: 15px;
+    opacity: 0; transition: opacity 0.2s ease, transform 0.2s ease; pointer-events: none; z-index: 30;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  footer { opacity: 0.4; font-size: 12px; text-align: center; max-width: 600px; }
+</style>
+</head>
+<body>
+  <a class="back" href="index.html">← Spiele</a>
+  <header>
+    <h1>Vivis Tierpraxis</h1>
+    <p>Pflege die Tiere gesund – als kleine Tierärztin 🐾</p>
+  </header>
+
+  <div class="wrap">
+    <div class="stage" id="stage"></div>
+
+    <div class="controls">
+      <div class="panel">
+        <div class="ask" id="ask"></div>
+        <div class="chips" id="hints" style="margin-top:10px"></div>
+      </div>
+
+      <div class="panel">
+        <div class="meterLbl"><span>Wohlgefühl</span><span id="meterPct">0%</span></div>
+        <div class="meter"><i id="meterFill"></i></div>
+      </div>
+
+      <div class="panel">
+        <h3>Werkzeuge — tippe eins an, dann aufs Tier</h3>
+        <div class="tools" id="tools"></div>
+      </div>
+
+      <div class="panel">
+        <div class="actions">
+          <button class="btn primary" id="nextBtn">Nächstes Tier ▶</button>
+          <button class="btn" id="saveBtn">💾 Bild speichern</button>
+          <button class="btn" id="soundBtn">🔊 Ton</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3 id="albumTitle">Sticker-Album</h3>
+        <div class="album" id="album"></div>
+        <div class="actions" style="margin-top:10px">
+          <button class="btn pink" id="resetBtn">🗑 Album zurücksetzen</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>Alles wird auf deinem Gerät gespeichert · Kein Verlieren – nur Helfen. 🐾</footer>
+
+<script>
+/* ====================== Daten ====================== */
+const SPECIES = [
+  { id:'dog',     name:'Bello',  p:'ihm', body:'#caa472', belly:'#efe2c8', ears:'floppy', snout:'dog',   tail:'wag',      nose:'#3a2b22' },
+  { id:'cat',     name:'Minka',  p:'ihr', body:'#9aa0a6', belly:'#e9ebee', ears:'pointy', snout:'cat',   tail:'curl',     nose:'#e29bb0', whiskers:true },
+  { id:'rabbit',  name:'Hoppel', p:'ihm', body:'#f2eae3', belly:'#ffffff', ears:'tall',   snout:'small', tail:'puff',     nose:'#e29bb0' },
+  { id:'bird',    name:'Pieps',  p:'ihm', body:'#ffd166', belly:'#ffe9a8', ears:'none',   snout:'beak',  tail:'feathers', nose:'#3a2b22', beak:'#ff8c42' },
+  { id:'hamster', name:'Nugget', p:'ihm', body:'#e0a96d', belly:'#fbe6cf', ears:'round',  snout:'small', tail:'none',     nose:'#3a2b22', cheeks:true },
+  { id:'turtle',  name:'Theo',   p:'ihm', body:'#7bbf6a', belly:'#cfe8b8', ears:'none',   snout:'small', tail:'none',     nose:'#3a2b22', shell:'#5f8c3a' },
+  { id:'fox',     name:'Fix',    p:'ihm', body:'#e8843c', belly:'#f7eede', ears:'foxbig', snout:'fox',   tail:'bushy',    nose:'#3a2b22' },
+  { id:'pig',     name:'Rosi',   p:'ihr', body:'#f4a9b8', belly:'#ffd2dc', ears:'pig',    snout:'pig',   tail:'curly',    nose:'#e0708a' },
+];
+const SPECIES_BY_ID = Object.fromEntries(SPECIES.map(s=>[s.id,s]));
+
+const SYMPTOMS = [
+  { id:'wunde',     label:'🩹 Wunde',     tool:'🩹', toolName:'Pflaster' },
+  { id:'krank',     label:'💉 krank',     tool:'💉', toolName:'Spritze' },
+  { id:'fieber',    label:'🌡️ Fieber',    tool:'🌡️', toolName:'Thermometer' },
+  { id:'schmutzig', label:'🧽 schmutzig', tool:'🧽', toolName:'Schwamm' },
+  { id:'hungrig',   label:'🍖 hungrig',   tool:'🍖', toolName:'Futter' },
+  { id:'traurig',   label:'❤️ traurig',   tool:'❤️', toolName:'Streicheln' },
+];
+const SYM_BY_ID = Object.fromEntries(SYMPTOMS.map(s=>[s.id,s]));
+const PINK = '#f4a9b8';
+const PRAISE = ['Super gemacht! 🎉','Toll, {n} freut sich!','Bravo! 💖','Goldrichtig! ⭐','Weiter so! 👏','Das war lieb von dir! 🥰'];
+
+/* ====================== Speicher ====================== */
+function load(k,d){ try{ const v=JSON.parse(localStorage.getItem(k)); return v??d; }catch(e){ return d; } }
+function save(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
+function persist(){ save('vp_prefs',prefs); save('vp_album',album); }
+
+let prefs = load('vp_prefs', {sound:true});
+let album = load('vp_album', []);
+let patient = null;
+let activeTool = null;
+let celebrating = false;
+
+/* ====================== Helfer ====================== */
+function pick(a){ return a[Math.floor(Math.random()*a.length)]; }
+function shuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function shade(hex,f){
+  const n=parseInt(hex.slice(1),16); let r=(n>>16)&255,g=(n>>8)&255,b=n&255;
+  r=Math.min(255,Math.round(r*f)); g=Math.min(255,Math.round(g*f)); b=Math.min(255,Math.round(b*f));
+  return '#'+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);
+}
+
+/* ====================== Tier-Bausteine ====================== */
+function tailFrag(kind, c){
+  const dc = shade(c,0.82);
+  switch(kind){
+    case 'wag':      return `<path d="M214 220 Q256 196 248 164 Q236 190 208 206 Z" fill="${dc}"/>`;
+    case 'curl':     return `<path d="M214 222 Q258 220 250 182 Q244 206 210 210 Z" fill="${dc}"/>`;
+    case 'puff':     return `<circle cx="226" cy="238" r="18" fill="#ffffff"/><circle cx="226" cy="238" r="18" fill="#000" opacity="0.05"/>`;
+    case 'feathers': return `<path d="M210 208 Q250 198 264 212 Q244 218 224 224 Z" fill="${shade(c,0.9)}"/><path d="M208 222 Q248 218 260 236 Q240 236 220 234 Z" fill="${shade(c,0.8)}"/>`;
+    case 'bushy':    return `<path d="M208 226 Q260 208 250 166 Q238 200 204 214 Z" fill="${c}"/><path d="M250 166 Q258 182 250 198 Q242 188 240 176 Z" fill="#fbf3e6"/>`;
+    case 'curly':    return `<path d="M214 230 q26 -1 21 -17 q-3 11 -15 9" stroke="${dc}" stroke-width="6" fill="none" stroke-linecap="round"/>`;
+    default:         return '';
+  }
+}
+function earFrag(kind, c){
+  const dc = shade(c,0.82);
+  switch(kind){
+    case 'floppy':
+      return `<ellipse cx="100" cy="132" rx="18" ry="36" fill="${dc}" transform="rotate(-16 100 132)"/>`+
+             `<ellipse cx="200" cy="132" rx="18" ry="36" fill="${dc}" transform="rotate(16 200 132)"/>`;
+    case 'pointy':
+      return `<path d="M118 80 L98 32 L142 68 Z" fill="${c}"/><path d="M122 76 L110 48 L136 68 Z" fill="${PINK}"/>`+
+             `<path d="M182 80 L202 32 L158 68 Z" fill="${c}"/><path d="M178 76 L190 48 L164 68 Z" fill="${PINK}"/>`;
+    case 'tall':
+      return `<ellipse cx="126" cy="44" rx="14" ry="46" fill="${c}" transform="rotate(-8 126 44)"/><ellipse cx="126" cy="48" rx="7" ry="34" fill="${PINK}" transform="rotate(-8 126 48)"/>`+
+             `<ellipse cx="174" cy="44" rx="14" ry="46" fill="${c}" transform="rotate(8 174 44)"/><ellipse cx="174" cy="48" rx="7" ry="34" fill="${PINK}" transform="rotate(8 174 48)"/>`;
+    case 'round':
+      return `<circle cx="106" cy="80" r="20" fill="${c}"/><circle cx="194" cy="80" r="20" fill="${c}"/>`+
+             `<circle cx="106" cy="82" r="11" fill="${PINK}"/><circle cx="194" cy="82" r="11" fill="${PINK}"/>`;
+    case 'foxbig':
+      return `<path d="M114 78 L86 22 L150 60 Z" fill="${c}"/><path d="M120 74 L102 40 L146 62 Z" fill="${shade(c,0.78)}"/>`+
+             `<path d="M186 78 L214 22 L150 60 Z" fill="${c}"/><path d="M180 74 L198 40 L154 62 Z" fill="${shade(c,0.78)}"/>`;
+    case 'pig':
+      return `<path d="M120 76 L100 52 L140 62 Z" fill="${shade(c,0.92)}"/><path d="M180 76 L200 52 L160 62 Z" fill="${shade(c,0.92)}"/>`;
+    default: return '';
+  }
+}
+function snoutFrag(kind, sp){
+  switch(kind){
+    case 'dog':
+      return `<ellipse cx="150" cy="150" rx="27" ry="20" fill="${shade(sp.body,1.09)}"/><ellipse cx="150" cy="138" rx="10" ry="8" fill="${sp.nose}"/>`;
+    case 'cat':
+      return `<path d="M143 137 L157 137 L150 145 Z" fill="${sp.nose}"/>`;
+    case 'small':
+      return `<ellipse cx="150" cy="138" rx="7" ry="5.5" fill="${sp.nose}"/>`;
+    case 'beak':
+      return `<path d="M132 137 L150 129 L168 137 L150 152 Z" fill="${sp.beak}"/><line x1="133" y1="137" x2="167" y2="137" stroke="${shade(sp.beak,0.8)}" stroke-width="1.6"/>`;
+    case 'fox':
+      return `<path d="M150 118 Q126 142 150 160 Q174 142 150 118 Z" fill="#fbf3e6"/><ellipse cx="150" cy="134" rx="9" ry="7" fill="${sp.nose}"/>`;
+    case 'pig':
+      return `<ellipse cx="150" cy="146" rx="22" ry="15" fill="${shade(sp.body,0.95)}"/><ellipse cx="142" cy="146" rx="3.4" ry="5" fill="${sp.nose}"/><ellipse cx="158" cy="146" rx="3.4" ry="5" fill="${sp.nose}"/>`;
+    default: return '';
+  }
+}
+function extraFrag(sp){
+  let s='';
+  if(sp.whiskers){
+    s += `<g stroke="#cfd3d8" stroke-width="2" stroke-linecap="round" opacity="0.85">`+
+         `<line x1="118" y1="138" x2="142" y2="142"/><line x1="116" y1="148" x2="142" y2="148"/>`+
+         `<line x1="182" y1="138" x2="158" y2="142"/><line x1="184" y1="148" x2="158" y2="148"/></g>`;
+  }
+  if(sp.cheeks){
+    s += `<ellipse cx="114" cy="150" rx="18" ry="16" fill="${shade(sp.body,1.1)}"/><ellipse cx="186" cy="150" rx="18" ry="16" fill="${shade(sp.body,1.1)}"/>`;
+  }
+  return s;
+}
+function turtleShell(sp){
+  const d = shade(sp.shell,0.82), l = shade(sp.shell,1.14);
+  return `<ellipse cx="150" cy="214" rx="74" ry="60" fill="${sp.shell}"/>`+
+         `<ellipse cx="150" cy="208" rx="34" ry="28" fill="${l}"/>`+
+         `<g stroke="${d}" stroke-width="3" fill="none" opacity="0.8">`+
+         `<path d="M150 180 L150 150"/><path d="M116 196 L92 178"/><path d="M184 196 L208 178"/>`+
+         `<path d="M122 238 L104 258"/><path d="M178 238 L196 258"/>`+
+         `<ellipse cx="150" cy="208" rx="34" ry="28"/></g>`;
+}
+function buildFace(mood, sp){
+  let s='';
+  if(mood==='celebrate'){
+    s += `<path d="M116 116 q9 -12 18 0" stroke="#3a2b22" stroke-width="4" fill="none" stroke-linecap="round"/>`+
+         `<path d="M166 116 q9 -12 18 0" stroke="#3a2b22" stroke-width="4" fill="none" stroke-linecap="round"/>`;
+  } else {
+    s += eye(126)+eye(174);
+  }
+  // Augenbrauen + Mund je nach Stimmung
+  if(mood==='sad'){
+    s += `<path d="M116 100 q10 5 17 9" stroke="#5b4636" stroke-width="3" fill="none" stroke-linecap="round"/>`+
+         `<path d="M184 100 q-10 5 -17 9" stroke="#5b4636" stroke-width="3" fill="none" stroke-linecap="round"/>`;
+  }
+  if(sp.snout!=='beak'){
+    if(mood==='sad')      s += `<path d="M134 162 Q150 150 166 162" stroke="#5b4636" stroke-width="3.5" fill="none" stroke-linecap="round"/>`;
+    else if(mood==='celebrate') s += `<path d="M130 150 Q150 178 170 150 Z" fill="#fff" stroke="#5b4636" stroke-width="2.5"/><path d="M140 160 Q150 170 160 160 Z" fill="#ff7a9c"/>`;
+    else                  s += `<path d="M132 152 Q150 168 168 152" stroke="#5b4636" stroke-width="3.5" fill="none" stroke-linecap="round"/>`;
+  }
+  if(mood!=='sad'){
+    s += `<circle cx="110" cy="140" r="9" fill="#ff8fb0" opacity="0.4"/><circle cx="190" cy="140" r="9" fill="#ff8fb0" opacity="0.4"/>`;
+  }
+  return s;
+  function eye(x){ return `<circle cx="${x}" cy="116" r="8" fill="#3a2b22"/><circle cx="${x+2.5}" cy="113" r="2.6" fill="#fff"/>`; }
+}
+function tear(x,y){ return `<path d="M${x} ${y} q-6 9 0 14 q6 -5 0 -14 Z" fill="#7cc7ff" stroke="#5bb0ef" stroke-width="0.8"/>`; }
+
+function symptomOverlay(id){
+  let inner='';
+  if(id==='wunde'){
+    inner = `<g transform="rotate(22 118 250)"><rect x="100" y="244" width="36" height="13" rx="6" fill="#f6dcb3" stroke="#e3c08a" stroke-width="1.5"/>`+
+            `<rect x="112" y="232" width="12" height="37" rx="6" fill="#f6dcb3" stroke="#e3c08a" stroke-width="1.5"/>`+
+            `<line x1="105" y1="250" x2="131" y2="250" stroke="#e3c08a" stroke-width="1" stroke-dasharray="2 3"/></g>`;
+  } else if(id==='schmutzig'){
+    inner = `<g fill="#8a6a47" opacity="0.55"><ellipse cx="122" cy="206" rx="14" ry="9"/><ellipse cx="170" cy="228" rx="16" ry="10"/>`+
+            `<ellipse cx="146" cy="248" rx="12" ry="8"/><ellipse cx="186" cy="204" rx="11" ry="8"/><ellipse cx="150" cy="196" rx="9" ry="6"/></g>`+
+            `<g fill="#6f5436" opacity="0.5"><circle cx="132" cy="216" r="2.5"/><circle cx="178" cy="238" r="2.5"/><circle cx="158" cy="206" r="2"/></g>`;
+  } else if(id==='fieber'){
+    inner = `<g transform="rotate(38 196 150)"><rect x="174" y="146" width="42" height="8" rx="4" fill="#ffffff" stroke="#cbd3da" stroke-width="1.5"/>`+
+            `<circle cx="216" cy="150" r="7" fill="#ef476f"/><rect x="180" y="148" width="30" height="4" rx="2" fill="#ef476f"/></g>`+
+            tear(120,86)+tear(182,84);
+  } else if(id==='hungrig'){
+    inner = `<circle cx="206" cy="92" r="4" fill="#ffffff" opacity="0.95"/><circle cx="220" cy="78" r="6" fill="#ffffff" opacity="0.95"/>`+
+            `<ellipse cx="246" cy="56" rx="28" ry="22" fill="#ffffff" opacity="0.97"/><text x="246" y="65" font-size="24" text-anchor="middle">🍖</text>`;
+  } else if(id==='traurig'){
+    inner = tear(124,128)+tear(176,128);
+  } else if(id==='krank'){
+    inner = `<ellipse cx="150" cy="118" rx="60" ry="60" fill="#7fdc97" opacity="0.32"/><ellipse cx="150" cy="215" rx="72" ry="58" fill="#7fdc97" opacity="0.32"/>`;
+  }
+  return `<g class="sym" data-sym="${id}">${inner}</g>`;
+}
+
+function buildAnimal(speciesId, symptoms, mood){
+  const sp = SPECIES_BY_ID[speciesId];
+  symptoms = symptoms || [];
+  const sad = symptoms.includes('traurig');
+  const m = mood || (sad ? 'sad' : 'happy');
+  const dc = shade(sp.body,0.82);
+  const isTurtle = sp.id === 'turtle';
+  const overlays = symptoms.map(s=>symptomOverlay(s)).join('');
+  return `
+  <svg viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="vpbg" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#fef6ff"/><stop offset="1" stop-color="#e6f3ff"/>
+      </linearGradient>
+    </defs>
+    <rect width="300" height="300" fill="url(#vpbg)"/>
+    <ellipse cx="150" cy="284" rx="128" ry="20" fill="#000000" opacity="0.06"/>
+    <ellipse cx="150" cy="276" rx="120" ry="15" fill="#ffffff" opacity="0.5"/>
+    <g class="animal">
+      ${tailFrag(sp.tail, sp.body)}
+      <ellipse cx="118" cy="268" rx="20" ry="13" fill="${dc}"/>
+      <ellipse cx="182" cy="268" rx="20" ry="13" fill="${dc}"/>
+      <ellipse cx="150" cy="215" rx="72" ry="58" fill="${sp.body}"/>
+      ${isTurtle ? turtleShell(sp) : `<ellipse cx="150" cy="224" rx="46" ry="42" fill="${sp.belly}"/>`}
+      <circle cx="150" cy="118" r="60" fill="${sp.body}"/>
+      ${earFrag(sp.ears, sp.body)}
+      ${extraFrag(sp)}
+      ${snoutFrag(sp.snout, sp)}
+      ${buildFace(m, sp)}
+    </g>
+    ${overlays}
+  </svg>`;
+}
+
+/* ====================== Render ====================== */
+const $ = id => document.getElementById(id);
+function uncured(){ return patient.symptoms.filter(s=>!patient.cured.has(s)); }
+
+function render(){
+  const mood = celebrating ? 'celebrate' : undefined;
+  $('stage').innerHTML = buildAnimal(patient.species, uncured(), mood);
+}
+function renderInfo(){
+  const sp = SPECIES_BY_ID[patient.species];
+  if(celebrating){
+    $('ask').innerHTML = `<b>${sp.name}</b> ist wieder gesund und glücklich! 🎉`;
+  } else {
+    $('ask').innerHTML = `Das ist <b>${sp.name}</b>. Was fehlt ${sp.p}?`;
+  }
+  $('hints').innerHTML = patient.symptoms.map(s=>{
+    const done = patient.cured.has(s);
+    return `<span class="chip${done?' done':''}">${SYM_BY_ID[s].label}</span>`;
+  }).join('');
+}
+function renderMeter(){
+  const pct = Math.round(patient.cured.size / patient.symptoms.length * 100);
+  $('meterFill').style.width = pct+'%';
+  $('meterPct').textContent = pct+'%';
+}
+function renderTools(){
+  $('tools').innerHTML = SYMPTOMS.map(s=>
+    `<div class="tool${activeTool===s.id?' active':''}" data-tool="${s.id}">`+
+    `<span class="em">${s.tool}</span><span class="nm">${s.toolName}</span></div>`
+  ).join('');
+  document.querySelectorAll('.tool').forEach(el=>{
+    el.onclick = ()=>{ ensureAudio(); activeTool = el.dataset.tool; renderTools(); };
+  });
+}
+function renderAlbum(){
+  $('albumTitle').textContent = album.length
+    ? `Sticker-Album · ${album.length} Tier${album.length===1?'':'e'} geheilt`
+    : 'Sticker-Album';
+  if(!album.length){
+    $('album').innerHTML = `<div class="albumEmpty">Noch keine Sticker – heile dein erstes Tier! 🐾</div>`;
+    return;
+  }
+  $('album').innerHTML = album.slice().reverse().map(a=>
+    `<div class="sticker">${buildAnimal(a.species, [], 'happy')}</div>`
+  ).join('');
+}
+
+/* ====================== Spielablauf ====================== */
+function newPatient(){
+  celebrating = false;
+  const sp = pick(SPECIES);
+  const n = 2 + Math.floor(Math.random()*3); // 2..4
+  const syms = shuffle(SYMPTOMS.map(s=>s.id)).slice(0,n);
+  patient = { species:sp.id, symptoms:syms, cured:new Set() };
+  activeTool = null;
+  $('nextBtn').disabled = true;
+  render(); renderInfo(); renderMeter(); renderTools();
+}
+
+function onStageTap(){
+  if(celebrating) return;
+  ensureAudio();
+  if(!activeTool){ toast('Wähle zuerst ein Werkzeug 🧰'); sndNope(); return; }
+  if(uncured().includes(activeTool)){
+    patient.cured.add(activeTool);
+    sndCure();
+    const g = document.querySelector(`#stage [data-sym="${activeTool}"]`);
+    if(g) g.classList.add('cured');
+    const sp = SPECIES_BY_ID[patient.species];
+    toast(pick(PRAISE).replace('{n}', sp.name));
+    renderMeter(); renderInfo();
+    const done = patient.cured.size === patient.symptoms.length;
+    setTimeout(()=>{ if(done) celebrate(); else render(); }, 280);
+  } else {
+    sndNope();
+    const st = $('stage'); st.classList.remove('shake'); void st.offsetWidth; st.classList.add('shake');
+    toast('Hmm, das hilft hier nicht 🤔');
+  }
+}
+
+function celebrate(){
+  celebrating = true;
+  render(); renderInfo();
+  sndWin();
+  confetti();
+  const sp = SPECIES_BY_ID[patient.species];
+  album.push({ species:patient.species, t:Date.now() });
+  persist(); renderAlbum();
+  $('nextBtn').disabled = false;
+  toast(`${sp.name} ist wieder gesund! 🎉`);
+}
+
+function confetti(){
+  const box = document.createElement('div');
+  box.className = 'confetti';
+  const emo = ['💖','⭐','🎉','✨','🐾','💚','🌟'];
+  let html='';
+  for(let i=0;i<16;i++){
+    const left = Math.random()*100, dur = 1.1+Math.random()*1.1, delay = Math.random()*0.4;
+    html += `<span style="left:${left}%;animation-duration:${dur}s;animation-delay:${delay}s">${pick(emo)}</span>`;
+  }
+  box.innerHTML = html;
+  $('stage').appendChild(box);
+  setTimeout(()=>box.remove(), 2600);
+}
+
+/* ====================== Ton (WebAudio) ====================== */
+let actx = null;
+function ensureAudio(){
+  if(!prefs.sound) return;
+  if(!actx){ try{ actx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return; } }
+  if(actx.state === 'suspended') actx.resume();
+}
+function tone(freq, dur, type, when){
+  if(!prefs.sound || !actx) return;
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.type = type||'sine'; o.frequency.value = freq;
+  const t = actx.currentTime + (when||0);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.22, t+0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, t+(dur||0.12));
+  o.connect(g).connect(actx.destination); o.start(t); o.stop(t+(dur||0.12)+0.03);
+}
+const sndCure = ()=>{ tone(660,0.12,'sine'); tone(880,0.12,'sine',0.08); };
+const sndNope = ()=>tone(170,0.18,'square');
+const sndWin  = ()=>{ [523,659,784,1047].forEach((f,i)=>tone(f,0.18,'triangle',i*0.12)); };
+
+/* ====================== Toast ====================== */
+let toastTimer = null;
+function toast(msg){
+  let t = $('toast');
+  if(!t){ t = document.createElement('div'); t.id='toast'; t.className='toast'; document.body.appendChild(t); }
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(()=>t.classList.remove('show'), 1500);
+}
+
+/* ====================== Knöpfe ====================== */
+$('stage').addEventListener('pointerdown', onStageTap);
+$('nextBtn').onclick = ()=>newPatient();
+$('soundBtn').onclick = ()=>{
+  prefs.sound = !prefs.sound; persist();
+  $('soundBtn').textContent = prefs.sound ? '🔊 Ton' : '🔇 Ton aus';
+  if(prefs.sound){ ensureAudio(); sndCure(); }
+};
+$('resetBtn').onclick = ()=>{
+  if(!confirm('Sticker-Album wirklich leeren?')) return;
+  album = []; persist(); renderAlbum();
+};
+$('saveBtn').onclick = ()=>{
+  const svg = document.querySelector('#stage svg');
+  if(!svg) return;
+  const xml = new XMLSerializer().serializeToString(svg);
+  const svg64 = 'data:image/svg+xml;base64,'+btoa(unescape(encodeURIComponent(xml)));
+  const img = new Image();
+  img.onload = ()=>{
+    const c = document.createElement('canvas'); c.width=600; c.height=600;
+    const ctx = c.getContext('2d'); ctx.drawImage(img,0,0,600,600);
+    const a = document.createElement('a');
+    a.download = 'tierpraxis-'+(patient?patient.species:'tier')+'.png';
+    a.href = c.toDataURL('image/png'); a.click();
+  };
+  img.src = svg64;
+};
+
+/* ====================== Start ====================== */
+$('soundBtn').textContent = prefs.sound ? '🔊 Ton' : '🔇 Ton aus';
+renderAlbum();
+newPatient();
+</script>
+</body>
+</html>
