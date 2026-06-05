@@ -220,37 +220,42 @@
     </div>
   </div>
 
-  <footer>Tipp: Stelle <b>Format</b> und <b>Zoom</b> der Leinwand ein – sie darf auch größer als der Bildschirm sein. Mit ✋ <b>Verschieben</b> bewegst du dich über eine große Leinwand. 🪣 <b>Füllen</b> koloriert ganze Flächen mit einem Klick.<span id="diag" style="display:block;opacity:0.7;margin-top:4px;"></span></footer>
+  <footer>Tipp: Stelle <b>Format</b> und <b>Zoom</b> der Leinwand ein – sie darf auch größer als der Bildschirm sein. Mit ✋ <b>Verschieben</b> bewegst du dich über eine große Leinwand. 🪣 <b>Füllen</b> koloriert ganze Flächen mit einem Klick.</footer>
 
 <script>
 "use strict";
 (function () {
-  const canvas = document.getElementById("canvas");
-  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  const canvas = document.getElementById("canvas");   // sichtbares Canvas (nur Anzeige)
+  const vctx = canvas.getContext("2d");
   const stage = document.getElementById("stage");
   const scroll = document.getElementById("canvasScroll");
-  // W/H = Auflösung des Zeichenpuffers (kann per Format geändert werden).
-  let W = canvas.width, H = canvas.height;
+
+  // Gezeichnet wird auf eine UNSICHTBARE Arbeitsfläche fester Auflösung (doc).
+  // Das sichtbare Canvas zeigt diese Fläche nur skaliert an. Seine Größe
+  // steckt komplett in den Attributen width/height (KEINE CSS-Höhe), darum
+  // kann es auf iOS nicht zu einem Streifen zusammenfallen.
+  const doc = document.createElement("canvas");
+  let W = 1100, H = 900;            // Auflösung der Arbeitsfläche (= Format)
+  doc.width = W; doc.height = H;
+  const ctx = doc.getContext("2d", { willReadFrequently: true });
 
   // ---------- Leinwandgröße & Zoom ----------
-  // zoom in % der Anzeige: 100 % = 1 Canvas-Pixel : 1 CSS-Pixel. Wird die
-  // Anzeige größer als der sichtbare Bereich, kann man scrollen/verschieben.
   let zoom = 100;
 
+  // Arbeitsfläche skaliert ins sichtbare Canvas blitten.
+  function render() {
+    vctx.imageSmoothingEnabled = true;
+    vctx.clearRect(0, 0, canvas.width, canvas.height);
+    vctx.drawImage(doc, 0, 0, W, H, 0, 0, canvas.width, canvas.height);
+  }
+
   function applyDisplay() {
-    const w = Math.round(W * zoom / 100);
-    const h = Math.round(H * zoom / 100);
-    // px direkt am Canvas (iOS-sicher) UND am Stage als Absicherung.
-    canvas.style.width  = w + "px";
-    canvas.style.height = h + "px";
-    stage.style.width   = w + "px";
-    stage.style.height  = h + "px";
-    const d = document.getElementById("diag");
-    if (d) {
-      const r = canvas.getBoundingClientRect();
-      d.textContent = " · v14 · Anzeige " + w + "×" + h +
-        " · gemessen " + Math.round(r.width) + "×" + Math.round(r.height);
-    }
+    const w = Math.max(1, Math.round(W * zoom / 100));
+    const h = Math.max(1, Math.round(H * zoom / 100));
+    // Größe ausschließlich über die Canvas-Attribute (iOS-sicher).
+    if (canvas.width !== w) canvas.width = w;
+    if (canvas.height !== h) canvas.height = h;
+    render();
   }
 
   function setZoom(z, fromSlider) {
@@ -272,9 +277,9 @@
     // bestehende Zeichnung erhalten (oben links ausgerichtet)
     const tmp = document.createElement("canvas");
     tmp.width = W; tmp.height = H;
-    tmp.getContext("2d").drawImage(canvas, 0, 0);
+    tmp.getContext("2d").drawImage(doc, 0, 0);
     W = w; H = h;
-    canvas.width = w; canvas.height = h;
+    doc.width = w; doc.height = h;
     fillWhite();
     ctx.drawImage(tmp, 0, 0);
     undoStack.length = 0;
@@ -294,8 +299,6 @@
   document.getElementById("zoomFit").addEventListener("click", fitZoom);
   window.addEventListener("orientationchange", fitZoom);
   window.addEventListener("load", fitZoom);
-  applyDisplay();
-  fitZoom();
 
   // ---------- Zustand ----------
   const state = {
@@ -323,6 +326,10 @@
     ctx.fillRect(0, 0, W, H);
   }
   fillWhite();
+
+  // Erstanzeige: Größe einpassen und Arbeitsfläche anzeigen.
+  applyDisplay();
+  fitZoom();
 
   // ---------- Farbpalette ----------
   const palette = [
@@ -559,6 +566,7 @@
     if (state.tool === "fill") {
       pushUndo();
       floodFill(p.x, p.y, hexToRgb(strokeStyleFor()));
+      render();
       return;
     }
     pushUndo();
@@ -566,6 +574,7 @@
     state.last = p;
     // Punkt setzen (für Klick ohne Bewegung)
     drawSegment(p, { x: p.x + 0.01, y: p.y + 0.01 });
+    render();
   }
   function move(e) {
     if (panning) {
@@ -581,6 +590,7 @@
     const p = pos(e);
     drawSegment(state.last, p);
     state.last = p;
+    render();
   }
   function end() {
     state.drawing = false;
@@ -601,15 +611,17 @@
   document.getElementById("undo").addEventListener("click", () => {
     if (!undoStack.length) return;
     ctx.putImageData(undoStack.pop(), 0, 0);
+    render();
   });
   document.getElementById("clear").addEventListener("click", () => {
     pushUndo();
     fillWhite();
+    render();
   });
   document.getElementById("save").addEventListener("click", () => {
     const a = document.createElement("a");
     a.download = "mein-bild.png";
-    a.href = canvas.toDataURL("image/png");
+    a.href = doc.toDataURL("image/png");   // volle Auflösung exportieren
     a.click();
   });
 
@@ -631,6 +643,7 @@
     ctx.fillStyle = "transparent";
     drawFn(ctx);
     ctx.restore();
+    render();
   }
 
   // Hilfsfunktion: glatte geschlossene Kurve durch Punkte
@@ -799,7 +812,7 @@
   window.addEventListener("keydown", (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
       e.preventDefault();
-      if (undoStack.length) ctx.putImageData(undoStack.pop(), 0, 0);
+      if (undoStack.length) { ctx.putImageData(undoStack.pop(), 0, 0); render(); }
     }
   });
 })();
